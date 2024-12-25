@@ -4,7 +4,7 @@ An Incident Management focused web application written in Python-Flask as a fina
 
 MIT License
 
-Copyright (c) 2024 Jimmy Jennings
+Copyright (c) 2024 James Jennings
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
