@@ -1,8 +1,11 @@
 # SireApp
 
+![logo](https://github.com/user-attachments/assets/6aa4f652-caaa-4baf-87d6-9a908372df3c)
+
 An Incident Management focused web application written in Python-Flask as a final-year project of my BSc (Hons) Cybersecurity and Networking Infrastructure. I am enrolled at Belfast Metropolitan College and this BSc (Hons) degree is underwritten by the Open University.
 
 MIT License
+
 
 Copyright (c) 2024 James Jennings
 
