@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard</title>
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='styles.css') }}">
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        .container {
+            padding: 30px;
+            background-color: #ffffff;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+            text-align: center;
+            width: 90%;
+            max-width: 600px;
+        }
+
+        .logo-container {
+            margin-bottom: 20px;
+        }
+
+        .logo {
+            max-width: 300px;
+            width: 100%;
+            height: auto;
+        }
+
+        .welcome-message h1 {
+            font-size: 20px;
+            margin-bottom: 20px;
+            color: #333; 
+        }
+
+        .profile-pic-container {
+            margin-bottom: 20px;
+        }
+
+        .profile-pic {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            border: 2px solid #ddd;
+            object-fit: cover;
+        }
+
+        .btn {
+            display: block;
+            padding: 10px 20px;
+            font-size: 14px;
+            border-radius: 5px;
+            text-decoration: none;
+            cursor: pointer;
+            color: white;
+            margin: 10px auto;
+            width: 100%;
+            max-width: 200px;
+            border: none;
+        }
+        .btn-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            justify-content: center;
+        }
+
+        .btn-logout {
+            background-color: #f44336;
+        }
+
+        .btn-logout:hover {
+            background-color: #d32f2f;
+        }
+
+        .btn-admin-incidents {
+            background-color: #ff5722;
+        }
+
+        .btn-admin-incidents:hover {
+            background-color: #e64a19;
+        }
+
+        .btn-admin-users {
+            background-color: #673ab7;
+        }
+
+        .btn-admin-users:hover {
+            background-color: #512da8;
+        }
+        .btn-user-dashboard {
+            background-color: #3a6ab7;
+        }
+
+        .btn-user-dashboard:hover {
+            background-color: #2d5089;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo-container">
+            <a href="{{ url_for('main.home') }}">
+                <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo" class="logo">
+            </a>
+        </div>
+
+        <div>
+            {% with messages = get_flashed_messages(with_categories=True) %}
+            {% if messages %}
+                <div class="messages">
+                    <ul>
+                    {% for category, message in messages %}
+                        <li class="{{ category }}">{{ message }}</li>
+                    {% endfor %}
+                    </ul>
+                </div>
+            {% endif %}
+            {% endwith %}
+        </div>
+
+        <div class="welcome-message">
+            <h1>Welcome, {{ current_user.First_Name }}</h1>
+        </div>
+
+        <div class="profile-pic-container">
+            <img src="{{ url_for('static', filename='profile_pics/default.png') }}" alt="Profile Picture" class="profile-pic">
+        </div>
+
+        <div class="btn-container">
+            <a href="{{ url_for('main.admin_users') }}" class="btn btn-admin-users">
+                Manage Users
+            </a>
+            <a href="{{ url_for('main.view_incidents') }}" class="btn btn-admin-incidents">
+                Manage Incidents
+            </a>
+            <a href="{{ url_for('main.user_dashboard') }}" class="btn btn-user-dashboard">
+                Dashboard
+            </a>
+        </div>
+
+        <form method="POST" action="{{ url_for('main.logout') }}">
+            {{ form.hidden_tag() }}
+            <button type="submit" class="btn btn-logout">Logout</button>
+        </form>
+        
+    </div>
+</body>
+</html>

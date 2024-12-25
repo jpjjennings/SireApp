@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Responder Dashboard</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            background-color: #f0f0f0;
+        }
+        header {
+            background-color: #ffffff;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #cccccc;
+        }
+        header h1 {
+            margin: 0;
+        }
+        .container {
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            flex-wrap: wrap;
+        }
+        .card {
+            background-color: #ffffff;
+            border: 1px solid #cccccc;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            margin: 10px;
+            flex: 1 1 30%;
+            max-width: 30%;
+            text-align: center;
+        }
+        .action-card {
+            display: flex;
+            justify-content: center;
+            margin-top: 20px;
+            padding: 20px;
+        }
+        .btn-report {
+            margin: 0 10px;
+            padding: 10px 15px;
+            background-color: #f71212;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            text-decoration: none;
+        }
+        .btn-report:hover {
+            background-color: #ae1010;
+        }
+        .btn-view-incidents {
+            margin: 0 10px;
+            padding: 10px 15px;
+            background-color: #d9a30f;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            text-decoration: none;
+        }
+        .btn-view-incidents:hover {
+            background-color: #a87e08;
+        }
+        .btn-dashboard {
+            margin: 0 10px;
+            padding: 10px 15px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            text-decoration: none;
+        }
+        .btn-dashboard:hover {
+            background-color: #0056b3;
+        }
+        .logo-container {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .logo {
+            max-width: 300px;
+            width: 100%;
+            height: auto;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+        th, td {
+            border: 1px solid #cccccc;
+            padding: 10px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+    </style>
+</head>
+<body>
+    <main>
+        <div class="logo-container">
+            <a href="{{ url_for('main.user_dashboard') }}">
+                <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo" class="logo">
+            </a>
+        </div>
+        <h2 style="text-align: center; margin: 20px 0;">Responder Dashboard</h2>
+        <div class="container">
+            <div class="card">
+                <h3>Assigned To Me</h3>
+                                <div>
+                    {% if assigned_incidents %}
+                        <table>
+                            <tr><th>ID</th><th>Title</th><th>Description</th></tr>
+                            {% for incident in assigned_incidents %}
+                                <tr>
+                                    <td>
+                                        <a href="{{ url_for('main.view_incident', incident_id=incident.ID) }}">
+                                        {{ incident.ID }}</a>
+                                    </td>
+                                    <td>{{ incident.Title }}</td>
+                                    <td>{{ incident.Description }}</td>
+                                </tr>
+                            {% endfor %}
+                        </table>
+                    {% else %}
+                        <p>No incidents assigned.</p>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="card">
+                <h3>Incidents Queue</h3>
+                <div>
+                    {% if queue_incidents %}
+                        <table>
+                            <tr><th>ID</th><th>Title</th><th>Description</th></tr>
+                            {% for incident in queue_incidents %}
+                                <tr>
+                                    <td>
+                                        <a href="{{ url_for('main.view_incident', incident_id=incident.ID) }}">
+                                        {{ incident.ID }}</a>
+                                    </td>
+                                    <td>{{ incident.Title }}</td>
+                                    <td>{{ incident.Description }}</td>
+                                </tr>
+                            {% endfor %}
+                        </table>
+                    {% else %}
+                        <p>No incidents in queue.</p>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="card">
+                <h3>High Priority Queue</h3>
+                <div>
+                    {% if urgent_incidents %}
+                        <table>
+                            <tr><th>ID</th><th>Title</th><th>Description</th><th>Severity</th></tr>
+                            {% for incident in urgent_incidents %}
+                                <tr>
+                                    <td>
+                                        <a href="{{ url_for('main.view_incident', incident_id=incident.ID) }}">
+                                        {{ incident.ID }}</a>
+                                    </td>
+                                    <td>{{ incident.Title }}</td>
+                                    <td>{{ incident.Description }}</td>
+                                    <td>{{ incident.Severity }}</td>
+                                </tr>
+                            {% endfor %}
+                        </table>
+                    {% else %}
+                        <p>No urgent incidents.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="action-card">
+            <a href="{{ url_for('main.report_incident') }}" class="btn btn-report">Report Incident</a>
+            <a href="{{ url_for('main.view_incidents') }}" class="btn btn-view-incidents">View Incidents</a>
+            <a href="{{ url_for('main.user_dashboard') }}" class="btn btn-dashboard">Dashboard</a>
+        </div>
+    </main>
+</body>
+</html>

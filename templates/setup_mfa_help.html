@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MFA Setup Help</title>
+    <link rel="stylesheet" type="text/css" href="static/styles.css">
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f4f4f4;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            text-align: center;
+        }
+        .container {
+            padding: 30px;
+            background-color: #ffffff;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+            max-width: 600px;
+            width: 100%;
+        }
+        h2 {
+            margin-bottom: 20px;
+            color: #333;
+        }
+        p {
+            margin-bottom: 15px;
+            color: #666;
+            font-size: 14px;
+        }
+        .app-logo-container {
+            margin-bottom: 20px;
+        }
+
+        .app-logo {
+            max-width: 300px;
+            width: 100%;
+            height: auto;
+        }
+        .logo-container {
+            margin: 20px 0;
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+        .logo-wrapper {
+            text-align: center;
+            flex: 1 1 100px;
+            max-width: 120px;
+        }
+        .logo {
+            max-width: 100%;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .logo:hover {
+            transform: scale(1.1);
+        }
+        .label {
+            margin-top: 5px;
+            font-size: 14px;
+            color: #333;
+            background-color: #e9ecef;
+            border-radius: 5px;
+            padding: 5px;
+            display: inline-block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo-container">
+            <a href="{{ url_for('main.home') }}">
+                <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo" class="logo">
+            </a>
+        </div>
+        <p></p>
+        <h2>Need Help Setting Up MFA?</h2>
+        <p>To enable multi-factor authentication (MFA), install an authenticator app on your mobile device. Here are some popular options:</p>
+
+        <div class="logo-container">
+            <script>
+                const apps = [
+                    { link: "https://play.google.com/store/apps/details?id=com.google.android.apps.authenticator2", img: "static/g-auth.png", name: "Google Authenticator" },
+                    { link: "https://play.google.com/store/apps/details?id=com.authy.authy", img: "static/authy.png", name: "Authy" },
+                    { link: "https://play.google.com/store/apps/details?id=com.azure.authenticator", img: "static/m-auth.png", name: "Microsoft Authenticator" }
+                ];
+                apps.forEach(app => {
+                    document.write(`
+                        <div class="logo-wrapper">
+                            <a href="${app.link}" target="_blank">
+                                <img src="${app.img}" alt="${app.name}" class="logo">
+                            </a>
+                            <div class="label">${app.name}</div>
+                        </div>
+                    `);
+                });
+            </script>
+        </div>
+
+        <p>Click on any of the logos to download the authenticator app from the Google Play Store.</p>
+        <p>If you have questions or need further assistance, reach out to your administrator.</p>
+        
+        <button type="button" class="btn" onclick="location.href='{{ url_for('main.login') }}'">Back to Login</button>
+    </div>
+</body>
+</html>

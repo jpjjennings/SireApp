@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manage Incidents</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='styles.css') }}">
+    <style>
+        .btn-custom {
+            height: 40px;
+            padding: 0 15px;
+            font-size: 14px;
+            border-radius: 5px;
+            width: 100%;
+            margin-bottom: 5px;
+        }
+
+        .btn-edit-incidents {
+            background-color: #007bff;
+            color: white;
+            border: none;
+        }
+
+        .btn-delete-incidents {
+            background-color: #dc3545;
+            color: white;
+            border: none;
+        }
+
+        .btn-unassign {
+            background-color: #dcaa35;
+            color: white;
+            border: none;
+        }
+
+        .btn-unassign:hover {
+            background-color: #bb8c20;
+        }
+
+        .btn-assign {
+            background-color: #28a745;
+            color: white;
+            border: none;
+        }
+
+        .btn-custom:hover {
+            filter: brightness(90%);
+        }
+
+        .btn-edit-incidents:hover {
+            background-color: #0056b3;
+        }
+
+        .btn-delete-incidents:hover {
+            background-color: #c82333;
+        }
+
+        .btn-assign:hover {
+            background-color: #218838;
+        }
+
+        td {
+            word-wrap: break-word;
+            max-width: 200px;
+        }
+
+        .table-responsive {
+            margin-top: 20px;
+        }
+
+        .container {
+            margin-top: 30px;
+            max-width: 1500px; 
+            width: 100%;
+            padding: 20px;
+        }
+
+        li {
+            list-style-type: none;
+        }
+
+        .logo-container {
+            margin-bottom: 20px;
+        }
+
+        .logo {
+            max-width: 300px;
+            width: 100%;
+            height: auto;
+        }
+
+        .action-buttons {
+            display: flex;
+            flex-direction: column;
+            align-items: stretch;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-4">
+        <div class="logo-container">
+            <a href="{{ url_for('main.home') }}">
+                <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo" class="logo">
+            </a>
+        </div>
+        <div>
+            {% with messages = get_flashed_messages(with_categories=True) %}
+            {% if messages %}
+                <div class="messages">
+                    <ul>
+                    {% for category, message in messages %}
+                        <li class="{{ category }}">{{ message }}</li>
+                    {% endfor %}
+                    </ul>
+                </div>
+            {% endif %}
+            {% endwith %}
+        </div>
+        <h2 class="text-center mb-4">Manage Incidents</h2>
+
+        <div class="table-responsive">
+            <table class="table table-bordered table-striped table-hover">
+                <thead class="thead-dark">
+                    <tr>
+                        <th>ID</th>
+                        <th>Title</th>
+                        <th>Description</th>
+                        <th>Category</th>
+                        <th>Severity</th>
+                        <th>Status</th>
+                        <th>Assigned To</th>
+                        <th>Reporter</th>
+                        <th>Created At</th>
+                        <th>Updated At</th>
+                        {% if current_user.Is_Admin or current_user.Is_Manager or current_user.Is_Responder %}
+                        <th>Actions</th>
+                        {% endif %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for incident in incidents %}
+                    <tr>
+                        <td>
+                            <a href="{{ url_for('main.view_incident', incident_id=incident.ID) }}">
+                                {{ incident.ID }}
+                            </a>
+                        </td>
+                        <td>{{ incident.Title }}</td>
+                        <td>{{ incident.Description }}</td>
+                        <td>{{ incident.Category }}</td>
+                        <td>{{ incident.Severity }}</td>
+                        <td>{{ incident.Status }}</td>
+                        <td>
+                            {% if incident.assigned_to %}
+                                <ul>
+                                    {% for user in incident.assigned_to %}
+                                        <li>{{ user.Username }}</li>
+                                    {% endfor %}
+                                </ul>
+                            {% else %}
+                                No users assigned to this incident.
+                            {% endif %}
+                        </td>
+                        <td>{{ incident.Reporter }}</td>
+                        <td>{{ incident.Created_At }}</td>
+                        <td>{{ incident.Updated_At }}</td>
+                        <td>
+                            <div class="action-buttons">
+                                {% if current_user.Is_Admin or current_user.Is_Manager %}
+                                <a href="{{ url_for('main.admin_edit_incident', incident_id=incident.ID) }}" 
+                                   class="btn btn-custom btn-edit-incidents btn-sm">Edit</a>
+                                <form action="{{ url_for('main.admin_delete_incident', incident_id=incident.ID) }}" 
+                                      method="post" class="mb-2">
+                                    {{ form.hidden_tag() }}
+                                    <button type="submit" class="btn btn-custom btn-delete-incidents btn-sm">Delete</button>
+                                </form>
+                                {% endif %}
+                                {% if current_user.Is_Admin or current_user.Is_Manager or current_user.Is_Responder %}
+                                <form action="{{ url_for('main.assign_to_me', incident_id=incident.ID) }}" method="post" onsubmit="return canAssign(3)" class="mb-2">
+                                    {{ form.hidden_tag() }}
+                                    <button type="submit" class="btn btn-custom btn-assign btn-sm">Assign to Me</button>
+                                </form>
+                                {% endif %}
+                                {% if current_user.Is_Admin or current_user.Is_Manager %}
+                                <div class="unassign-user">
+                                    <a href="{{ url_for('main.unassign_user', incident_id=incident.ID) }}" class="btn btn-custom btn-unassign btn-sm">Unassign User</a>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="text-center mt-3">
+            <a href="{{ url_for('main.user_dashboard') }}" class="btn btn-secondary">Back to Dashboard</a>
+        </div>
+        
+    </div>
+</body>
+
+<script>
+    function canAssign(maxUsers) {
+        const assignedUsers = {{ incidents.assigned_to | length }};
+        if (assignedUsers >= maxUsers) {
+            alert("This incident already has the maximum number of assigned users.");
+            return false;
+        }
+        return true;
+    }
+</script>
+<script src="https://code.jquery.com/jquery-3.3.1.slim.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js"></script>
+<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
+</html>

@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unassign User</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+    <style>
+        .container {
+            margin-top: 30px;
+            max-width: 600px;
+            padding: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="logo-container">
+        <a href="{{ url_for('main.home') }}">
+            <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo" class="logo">
+        </a>
+    </div>
+    <h1>Unassign User from Incident: {{ incident.Title }}</h1>
+
+    <form method="POST">
+        <label for="username">Select User to Unassign:</label>
+        <select name="username" id="username" required>
+            <option value="">--Select User--</option>
+            {% for user in assigned_users %}
+                <option value="{{ user.Username }}">{{ user.First_Name }} {{ user.Last_Name }}</option>
+            {% endfor %}
+        </select>
+        <button type="submit" class="btn btn-danger">Unassign</button>
+    </form>
+    
+    <a href="{{ url_for('main.view_incidents') }}">Cancel</a>
+</body>
+</html>

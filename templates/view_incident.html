@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Incident Details - {{ incident.Title }}</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='styles.css') }}">
+    <style>
+        body {
+    font-family: 'Arial', sans-serif;
+    background-color: #f9f9f9;
+    margin: 0;
+    padding: 0;
+}
+
+.container {
+    max-width: 2000px;
+    max-height: 95vh;
+    overflow-y: auto;
+    width: 90%;
+    margin: 40px auto;
+    padding: 20px;
+    background-color: #ffffff;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    border-radius: 10px;
+}
+
+.logo-container {
+    margin-bottom: 20px;
+}
+
+.flash-messages {
+    color: #f00000;
+    font-size: 22px;
+    font-weight: bold;
+}
+
+li {
+    list-style-type: none;
+}
+
+.logo {
+    max-width: 200px;
+    width: 100%;
+    height: auto;
+}
+
+.content {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 20px;
+}
+
+.details, .notes {
+    width: 48%;
+    border: 1px solid #ccc;
+    padding: 15px;
+    border-radius: 5px;
+    background: #f4f4f4;
+    text-align: left;
+    overflow-y: auto;
+}
+
+.add-note {
+    border-top: 1px solid #ccc;
+    border-bottom: 1px solid #ccc;
+    padding: 15px 0;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+.input-note {
+    width: 70%;
+    padding: 10px;
+    border-radius: 5px;
+    border: 1px solid #ccc;
+    margin-right: 10px;
+}
+
+button {
+    background-color: #007bff;
+    color: #fff;
+    border: none;
+    border-radius: 5px;
+    padding: 10px 15px;
+    cursor: pointer;
+    transition: background-color 0.3s, transform 0.3s;
+    font-size: 16px;
+}
+
+button:hover {
+    background-color: #0056b3;
+    transform: scale(1.05);
+}
+
+.back-button {
+    text-align: center;
+    padding: 10px 0;
+    background-color: #f4f4f4;
+    border-radius: 5px;
+}
+.urgent-heading {
+            color: red;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-4">
+        <div class="logo-container">
+            <a href="{{ url_for('main.home') }}">
+                <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo" class="logo">
+            </a>
+        </div>
+        <div class="flash-messages">
+            <div>
+                {% with messages = get_flashed_messages(with_categories=True) %}
+                    {% if messages %}
+                        <div class="messages">
+                            <ul>
+                            {% for category, message in messages %}
+                                <li class="{{ category }}">{{ message }}</li>
+                            {% endfor %}
+                            </ul>
+                        </div>
+                    {% endif %}
+                {% endwith %}
+            </div>
+        </div>
+        <div class="content">
+            <div class="details">
+                <h3>Incident Details</h3>
+                <p></p>
+                <p><strong>Title:</strong> {{ incident.Title }}</p>
+                <p><strong>Description:</strong> {{ incident.Description }}</p>
+                <p><strong>Category:</strong> {{ incident.Category }}</p>
+                <p><strong>Severity:</strong> {{ incident.Severity }}</p>
+                <p><strong>Status:</strong> {{ incident.Status }}</p>
+                <p><strong>Assigned To:</strong>
+                    {% if incident.assigned_to %}
+                        {% for user in incident.assigned_to %}
+                            {{ user.First_Name }} {{ user.Last_Name}} {% if not loop.last %}, {% endif %}
+                        {% endfor %}
+                    {% else %}
+                        Unassigned
+                    {% endif %}
+                </p>
+                <p><strong>Reporter:</strong> {{ incident.Reporter }}</p>
+                <p><strong>Created At:</strong> {{ incident.Created_At }}</p>
+                <p><strong>Updated At:</strong> {{ incident.Updated_At }}</p>
+            </div>
+            <div class="notes">
+                <h3>Work Notes</h3>
+                <ul>
+                    {% for note in incident.work_notes %}
+                        <li><strong>[{{ note.Created_At }}] - {{ note.Author }}:</strong> {{ note.Note }}</li>
+                    {% else %}
+                        <li>No work notes available for this incident.</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+        <div class="add-note">
+            <h3>Add Work Note</h3>
+            <form method="POST" action="{{ url_for('main.view_incident', incident_id=incident.ID) }}">
+                <input type="text" name="note" required placeholder="Enter your work note here...">
+                <button type="submit">Add Note</button>
+        </form>
+    </div>
+    <div class="back-button">
+            <button type="button" onclick="location.href='{{ url_for('main.view_incidents') }}'">Back to Incidents</button>
+        </div>
+    </div>
+</body>
+</html>

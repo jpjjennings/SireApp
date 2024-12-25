@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Edit User</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='styles.css') }}">
+<style>
+    .container {
+            padding: 30px;
+            background-color: #ffffff;
+            border: 2px solid #000000;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            max-width: 500px;
+            width: 100%;
+            transition: transform 0.2s;
+        }
+</style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo-container">
+            <a href="{{ url_for('main.home') }}">
+                <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo" class="logo">
+            </a>
+        </div>
+        <h1>Edit User</h1>
+        <div>
+            {% with messages = get_flashed_messages(with_categories=True) %}
+            {% if messages %}
+                <div class="messages">
+                    <ul>
+                    {% for category, message in messages %}
+                        <li class="{{ category }}">{{ message }}</li>
+                    {% endfor %}
+                    </ul>
+                </div>
+            {% endif %}
+            {% endwith %}
+        </div>
+        <form method="POST" action="{{ url_for('main.admin_users_edit', user_id=user_to_edit.ID) }}">
+            {{ form.hidden_tag() }}
+            <div class="form-group">
+                {{ form.Username.label }} 
+                {{ form.Username(class="form-control", value=user_to_edit.Username) }}
+            </div>
+            <div class="form-group">
+                {{ form.First_Name.label }}
+                {{ form.First_Name(class="form-control", value=user_to_edit.First_Name) }}
+            </div>
+            <div class="form-group">
+                {{ form.Last_Name.label }}
+                {{ form.Last_Name(class="form-control", value=user_to_edit.Last_Name) }}
+            </div>
+            <div class="form-group">
+                {{ form.Email.label }}
+                {{ form.Email(class="form-control", value=user_to_edit.Email) }}
+            </div>
+            <div class="form-group">
+                {{ form.Manager.label }}
+                {{ form.Manager(class="form-control", value=user_to_edit.Manager) }}
+            </div>
+            <div class="form-check">
+                {{ form.Is_Admin(class="form-check-input", checked=user_to_edit.Is_Admin) }}
+                {{ form.Is_Admin.label(class="form-check-label") }}
+            </div>
+            <div class="form-check">
+                {{ form.Is_Manager(class="form-check-input", checked=user_to_edit.Is_Manager) }}
+                {{ form.Is_Manager.label(class="form-check-label") }}
+            </div>
+            <div class="form-check">
+                {{ form.Is_Responder(class="form-check-input", checked=user_to_edit.Is_Responder) }}
+                {{ form.Is_Responder.label(class="form-check-label") }}
+            </div>
+            <div class="form-check">
+                {{ form.Security_Questions_Set(class="form-check-input", checked=user_to_edit.Security_Questions_Set) }}
+                {{ form.Security_Questions_Set.label(class="form-check-label") }}
+            </div>
+            <div class="form-check">
+                {{ form.MFA_Setup_Completed(class="form-check-input", checked=user_to_edit.MFA_Setup_Completed) }}
+                {{ form.MFA_Setup_Completed.label(class="form-check-label") }}
+            </div>
+            <div class="form-check">
+                {{ form.MFA_Required(class="form-check-input", checked=user_to_edit.MFA_Required) }}
+                {{ form.MFA_Required.label(class="form-check-label") }}
+            </div>
+            <div class="form-group">
+                {{ form.Role.label }}
+                {{ form.Role(class="form-control", value=user_to_edit.Role) }}
+            </div>
+            <button type="button" class="btn btn-info mt-3" data-toggle="modal" data-target="#passwordResetModal">Reset Users Password</button>
+            <button type="submit" class="btn btn-primary">Update User</button>
+        </form>
+        <a href="{{ url_for('main.admin_users') }}" class="btn btn-secondary mt-3">Cancel</a>
+        <div class="modal fade" id="passwordResetModal" tabindex="-1" role="dialog" aria-labelledby="passwordResetModalLabel" aria-hidden="true">
+            <div class="modal-dialog" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="passwordResetModalLabel">Are you sure you want to reset the password for this user?</h5>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="resetPasswordForm" method="POST" action="{{ url_for('main.admin_password_reset', user_id=user_to_edit.ID) }}">
+                            {{ reset_form.hidden_tag() }}
+                            <div class="form-group">
+                                <p>Please enter a OTP to confirm this action.</p>
+                                {{ reset_form.mfa_otp(class="form-control") }}
+                            </div>
+                            <button type="submit" class="btn btn-primary">Submit</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js"></script>
+        <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
+    </div>
+</body>
+</html>
