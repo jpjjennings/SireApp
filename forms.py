@@ -1,10 +1,17 @@
 from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, SelectField, TextAreaField, SubmitField, BooleanField, EmailField, HiddenField
 from wtforms.validators import InputRequired, Length, DataRequired, Email
+from models import User
 
 class LoginForm(FlaskForm):
     username = StringField('Username', validators=[InputRequired(), Length(min=3, max=50)])
     password = PasswordField('Password', validators=[InputRequired(), Length(min=6, max=50)])
+
+class ChangePasswordForm(FlaskForm):
+    current_password = PasswordField('Current Password', validators=[InputRequired(), Length(min=6, max=50)])
+    new_password = PasswordField('New Password', validators=[InputRequired(), Length(min=6, max=50)])
+    confirm_password = PasswordField('Confirm Password', validators=[InputRequired(), Length(min=6, max=50)])
+    submit = SubmitField('Change Password')
 
 class UserForm(FlaskForm):
     username = StringField('Username', validators=[DataRequired()])
@@ -46,13 +53,17 @@ class IncidentForm(FlaskForm):
         ('High', 'High'),
         ('Critical', 'Critical')
     ], validators=[InputRequired()])
-    is_urgent = HiddenField('Is Urgent')
+    is_urgent = BooleanField('Is Urgent', render_kw={'disabled': 'disabled'})
     status = HiddenField('Status')
     assigned_to = HiddenField('Assigned To')
     submit = SubmitField('Submit Incident')
 
 class LogoutForm(FlaskForm):
     pass
+
+class AssignUserForm(FlaskForm):
+    username = SelectField('Username', choices=[], validators=[DataRequired()])
+    submit = SubmitField('Assign User')
 
 class AddUserForm(FlaskForm):
     first_name = StringField('First Name', validators=[DataRequired()])
@@ -64,11 +75,18 @@ class AddUserForm(FlaskForm):
         ('Responder', 'Responder'),
         ('Reporter', 'Reporter')
     ], validators=[InputRequired()])
-    manager = StringField('Manager')
+    manager = SelectField('Manager', validators=[InputRequired()])
     submit = SubmitField('Add User')
+
+    def __init__(self, *args, **kwargs):
+        super(AddUserForm, self).__init__(*args, **kwargs)
+        managers = User.query.filter_by(Is_Manager=True).all()
+        manager_choices = [(manager.Username, manager.First_Name + " " + manager.Last_Name) for manager in managers]
+        self.manager.choices = manager_choices
 
 
 class DeleteUserForm(FlaskForm):
+    mfa_otp = StringField('MFA OTP', validators=[DataRequired()])
     submit = SubmitField('Delete')
 
 class EditUserForm(FlaskForm):
@@ -77,15 +95,22 @@ class EditUserForm(FlaskForm):
     Last_Name = StringField('Last Name', validators=[DataRequired(), Length(max=50)])
     Email = EmailField('Email', validators=[DataRequired(), Email()])
     Role = SelectField('Role', choices=[('Manager', 'Manager'), ('Responder', 'Responder'), ('Reporter', 'Reporter')], validators=[DataRequired()])
-    Manager = StringField('Manager')
+    Manager = SelectField('Manager', validators=[InputRequired()])
     Is_Admin = BooleanField('Is Admin', render_kw={'disabled': 'disabled'})
     Is_Manager = BooleanField('Is Manager', render_kw={'disabled': 'disabled'})
     Is_Responder = BooleanField('Is Responder', render_kw={'disabled': 'disabled'})
+    Is_Test_User = BooleanField('Is Test User', render_kw={'disabled': 'disabled'})
     Security_Questions_Set = BooleanField('Security Questions Set')
     MFA_Setup_Completed = BooleanField('MFA Setup Completed')
     MFA_Required = BooleanField('MFA Required', render_kw={'disabled': 'disabled'})
     First_Login_Completed = BooleanField('First Login Completed', render_kw={'disabled': 'disabled'})
     Submit = SubmitField('Save Changes')
+
+    def __init__(self, *args, **kwargs):
+        super(EditUserForm, self).__init__(*args, **kwargs)
+        managers = User.query.filter_by(Is_Manager=True).all()
+        manager_choices = [(manager.Username, manager.First_Name + " " + manager.Last_Name) for manager in managers]
+        self.Manager.choices = manager_choices
 
 class SecurityQuestionForm(FlaskForm):
     questions = [
@@ -114,9 +139,15 @@ class SecurityQuestionForm(FlaskForm):
 
     question_3 = SelectField('Question 3', choices=questions, validators=[DataRequired()])
     answer_3 = StringField('Answer', validators=[DataRequired(), Length(max=100)])
-    
+
     submit = SubmitField('Save Changes')
 
 class AdminResetPasswordForm(FlaskForm):
+    mfa_otp = StringField('MFA OTP', validators=[DataRequired()])
+    submit = SubmitField('Verify OTP')
+class AdminUserDeleteForm(FlaskForm):
+    mfa_otp = StringField('MFA OTP', validators=[DataRequired()])
+    submit = SubmitField('Verify OTP')
+class AdminIncidentDeleteForm(FlaskForm):
     mfa_otp = StringField('MFA OTP', validators=[DataRequired()])
     submit = SubmitField('Verify OTP')

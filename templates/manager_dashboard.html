@@ -4,30 +4,101 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Manager Dashboard</title>
-    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='styles.css') }}">
     <style>
         body {
-            font-family: 'Arial', sans-serif;
-            background-color: #f4f4f4;
+            font-family: Arial, sans-serif;
             margin: 0;
-            padding: 0;
+            background-color: #f0f0f0;
+        }
+        header {
+            background-color: #ffffff;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #cccccc;
+        }
+        header h1 {
+            margin: 0;
+        }
+        .container {
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            flex-wrap: wrap;
+        }
+        .card {
+            background-color: #ffffff;
+            border: 1px solid #cccccc;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            margin: 10px;
+            flex: 1 1 30%;
+            max-width: 30%;
+            text-align: center;
+        }
+        .action-card {
             display: flex;
             justify-content: center;
-            align-items: center;
-            height: 100vh;
+            margin-top: 20px;
+            padding: 20px;
+        }
+        .btn-report {
+            margin: 0 10px;
+            padding: 10px 15px;
+            background-color: #f71212;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            text-decoration: none;
+        }
+        .btn-report:hover {
+            background-color: #ae1010;
+        }
+        .btn-view-incidents {
+            margin: 0 10px;
+            padding: 10px 15px;
+            background-color: #d9a30f;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            text-decoration: none;
+        }
+        .btn-view-incidents:hover {
+            background-color: #a87e08;
+        }
+        .btn-dashboard {
+            margin: 0 10px;
+            padding: 10px 15px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            text-decoration: none;
+        }
+        .btn-dashboard:hover {
+            background-color: #0056b3;
+        }
+        .btn-logout {
+            background-color: #f44336;
+            margin: 0 10px;
+            padding: 10px 15px;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            text-decoration: none;
         }
 
-        .container {
-            padding: 30px;
-            background-color: #ffffff;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-            border-radius: 10px;
-            text-align: center;
-            width: 90%;
-            max-width: 600px;
+        .btn-logout:hover {
+            background-color: #d32f2f;
         }
-
         .logo-container {
+            text-align: center;
             margin-bottom: 20px;
         }
 
@@ -36,107 +107,117 @@
             width: 100%;
             height: auto;
         }
-
-        .welcome-message h1 {
-            font-size: 20px;
-            margin-bottom: 20px;
-            color: #333;
-        }
-
-        .profile-pic-container {
-            margin-bottom: 20px;
-        }
-
-        .profile-pic {
-            width: 100px;
-            height: 100px;
-            border-radius: 50%;
-            border: 2px solid #ddd;
-            object-fit: cover;
-        }
-
-        .btn {
-            display: block;
-            padding: 10px 20px;
-            font-size: 14px;
-            border-radius: 5px;
-            text-decoration: none;
-            cursor: pointer;
-            color: white;
-            margin: 10px auto;
+        table {
             width: 100%;
-            max-width: 200px;
-            border: none;
+            border-collapse: collapse;
+            margin-top: 15px;
         }
-
-        .btn-logout {
-            background-color: #f44336;
+        th, td {
+            border: 1px solid #cccccc;
+            padding: 10px;
+            text-align: left;
         }
-
-        .btn-logout:hover {
-            background-color: #d32f2f;
-        }
-
-        .btn-report {
-            background-color: #ff5722;
-        }
-
-        .btn-report:hover {
-            background-color: #e64a19;
-        }
-
-        .btn-analytics {
-            background-color: #673ab7;
-        }
-
-        .btn-analytics:hover {
-            background-color: #512da8;
-        }
-
-        .btn-view-incidents {
-            background-color: #ff9800;
-        }
-
-        .btn-view-incidents:hover {
-            background-color: #f57c00;
+        th {
+            background-color: #f2f2f2;
         }
     </style>
 </head>
 <body>
-    <div class="container">
+    <main>
         <div class="logo-container">
-            <a href="{{ url_for('main.home') }}">
+            <a href="{{ url_for('main.user_dashboard') }}">
                 <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo" class="logo">
             </a>
         </div>
-
-        <div>
-            {% with messages = get_flashed_messages(with_categories=True) %}
-            {% if messages %}
-                <div class="messages">
-                    <ul>
-                    {% for category, message in messages %}
-                        <li class="{{ category }}">{{ message }}</li>
-                    {% endfor %}
-                    </ul>
+        <h2 style="text-align: center; margin: 20px 0;">Manager Dashboard</h2>
+        <div class="container">
+            <div class="card">
+                <h3>Team Incidents</h3>
+                <div>
+                    {% if team_incidents %}
+                        <table>
+                            <tr><th>ID</th><th>Title</th><th>Description</th><th>Assigned To</th></tr>
+                            {% for incident in team_incidents %}
+                                <tr>
+                                    <td>
+                                        <a href="{{ url_for('main.view_incident', incident_id=incident.ID) }}">
+                                        {{ incident.ID }}</a>
+                                    </td>
+                                    <td>{{ incident.Title }}</td>
+                                    <td>{{ incident.Description }}</td>
+                                    <td>
+                                    {% for user in incident.assigned_to %}
+                                         {{ user.Username }}{% if not loop.last %}, {% endif %}
+                                            {% endfor %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </table>
+                    {% else %}
+                        <p>No incidents assigned.</p>
+                    {% endif %}
                 </div>
-            {% endif %}
-            {% endwith %}
-        </div>  
-
-        <div class="welcome-message">
-            <h1>Welcome, {{ current_user.First_Name }}</h1>
+            </div>
+            <div class="card">
+                <h3>Incidents Queue</h3>
+                <div>
+                    {% if queue_incidents %}
+                        <table>
+                            <tr><th>ID</th><th>Title</th><th>Description</th></tr>
+                            {% for incident in queue_incidents %}
+                                <tr>
+                                    <td>
+                                        <a href="{{ url_for('main.view_incident', incident_id=incident.ID) }}">
+                                        {{ incident.ID }}</a>
+                                    </td>
+                                    <td>{{ incident.Title }}</td>
+                                    <td>{{ incident.Description }}</td>
+                                </tr>
+                            {% endfor %}
+                        </table>
+                    {% else %}
+                        <p>No incidents in queue.</p>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="card">
+                <h3>High Priority Queue</h3>
+                <div>
+                    {% if urgent_incidents %}
+                        <table>
+                            <tr><th>ID</th><th>Title</th><th>Description</th><th>Severity</th></tr>
+                            {% for incident in urgent_incidents %}
+                                <tr>
+                                    <td>
+                                        <a href="{{ url_for('main.view_incident', incident_id=incident.ID) }}">
+                                        {{ incident.ID }}</a>
+                                    </td>
+                                    <td>{{ incident.Title }}</td>
+                                    <td>{{ incident.Description }}</td>
+                                    <td>{{ incident.Severity }}</td>
+                                </tr>
+                            {% endfor %}
+                        </table>
+                    {% else %}
+                        <p>No urgent incidents.</p>
+                    {% endif %}
+                </div>
+            </div>
         </div>
 
-        <div class="profile-pic-container">
-            <img src="{{ url_for('static', filename='profile_pics/default.png') }}" alt="Profile Picture" class="profile-pic">
+        <div class="action-card">
+            <a href="{{ url_for('main.report_incident') }}" class="btn btn-report">Report Incident</a>
+            <a href="{{ url_for('main.view_incidents') }}" class="btn btn-view-incidents">View Incidents</a>
+            <a href="{{ url_for('main.user_dashboard') }}" class="btn btn-dashboard">Dashboard</a>
         </div>
+    </main>
+
 
         <form method="POST" action="{{ url_for('main.logout') }}">
             {{ form.hidden_tag() }}
             <button type="submit" class="btn btn-logout">Logout</button>
         </form>
-         
+
     </div>
 </body>
 </html>

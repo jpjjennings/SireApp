@@ -71,7 +71,7 @@
 
         .container {
             margin-top: 30px;
-            max-width: 1500px; 
+            max-width: 1500px;
             width: 100%;
             padding: 20px;
         }
@@ -100,7 +100,7 @@
 <body>
     <div class="container mt-4">
         <div class="logo-container">
-            <a href="{{ url_for('main.home') }}">
+            <a href="{{ url_for('main.user_dashboard') }}">
                 <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo" class="logo">
             </a>
         </div>
@@ -168,12 +168,14 @@
                         <td>
                             <div class="action-buttons">
                                 {% if current_user.Is_Admin or current_user.Is_Manager %}
-                                <a href="{{ url_for('main.admin_edit_incident', incident_id=incident.ID) }}" 
+                                <a href="{{ url_for('main.admin_edit_incident', incident_id=incident.ID) }}"
                                    class="btn btn-custom btn-edit-incidents btn-sm">Edit</a>
-                                <form action="{{ url_for('main.admin_delete_incident', incident_id=incident.ID) }}" 
+                                <form action="{{ url_for('main.admin_delete_incident', incident_id=incident.ID) }}"
                                       method="post" class="mb-2">
                                     {{ form.hidden_tag() }}
-                                    <button type="submit" class="btn btn-custom btn-delete-incidents btn-sm">Delete</button>
+                                    <button type="button" class="btn btn-custom btn-delete-incidents btn-sm"
+                                        data-toggle="modal" data-target="#incidentDeleteModal"
+                                        data-incident-id="{{ incident.ID }}">Delete</button>
                                 </form>
                                 {% endif %}
                                 {% if current_user.Is_Admin or current_user.Is_Manager or current_user.Is_Responder %}
@@ -197,9 +199,46 @@
 
         <div class="text-center mt-3">
             <a href="{{ url_for('main.user_dashboard') }}" class="btn btn-secondary">Back to Dashboard</a>
+            <form method="POST" action="{{ url_for('main.logout') }}">
+            {{ form.hidden_tag() }}
+            <button type="submit" class="btn btn-logout">Logout</button>
+        </form>
         </div>
-        
+        <div class="modal fade" id="incidentDeleteModal" tabindex="-1" role="dialog" aria-labelledby="incidentDeleteModalLabel" aria-hidden="true">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="incidentDeleteModalLabel">Confirm Deletion</h5>
+                </div>
+                <div class="modal-body">
+                    <form id="incidentDeleteForm" method="POST" action="">
+                        {{ delete_inc_form.hidden_tag() }}
+                        <div class="form-group">
+                            <label for="mfaOtp">Enter OTP to confirm:</label>
+                            {{ delete_inc_form.mfa_otp(class="form-control", id="mfaOtp") }}
+                        </div>
+                        <button type="submit" class="btn btn-danger">Confirm Deletion</button>
+                    </form>
+                </div>
+            </div>
+        </div>
     </div>
+    </div>
+    <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js"></script>
+        <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
+    <script>
+    $(document).ready(function () {
+        $('#incidentDeleteModal').on('show.bs.modal', function (event) {
+            var button = $(event.relatedTarget);
+            var incidentId = button.data('incident-id');
+            var form = $('#incidentDeleteForm');
+            var actionUrl = "{{ url_for('main.admin_delete_incident', incident_id=0) }}".replace('0', incidentId);
+            console.log(actionUrl);
+            form.attr('action', actionUrl);
+        });
+    });
+</script>
 </body>
 
 <script>
@@ -212,7 +251,5 @@
         return true;
     }
 </script>
-<script src="https://code.jquery.com/jquery-3.3.1.slim.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js"></script>
-<script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
+
 </html>

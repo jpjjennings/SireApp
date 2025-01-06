@@ -1,8 +1,8 @@
 from flask import Blueprint, render_template, request, session, redirect, url_for, flash, abort
 from flask_login import current_user, login_required, login_user, logout_user
-from forms import LoginForm, UserForm, IncidentForm, SecurityQuestionForm, AdminResetPasswordForm
+from forms import LoginForm, UserForm, IncidentForm, SecurityQuestionForm, AdminResetPasswordForm, AssignUserForm, ChangePasswordForm, AdminUserDeleteForm, AdminIncidentDeleteForm
 from models import get_db_connection, User, db, Incident, WorkNote, assigned_users, SecurityQuestion, SecurityAnswer
-from utils import get_user_by_session, serializer, password_reset_via_email, mt, user_password_no_security_q_set
+from utils import get_user_by_session, serializer, password_reset_via_email, mt, user_password_no_security_q_set, notify_assign_via_email
 from config import Config
 from werkzeug.security import check_password_hash, generate_password_hash
 import pyotp
@@ -12,6 +12,8 @@ import secrets
 from forms import IncidentForm, UserForm, LoginForm, LogoutForm, DeleteUserForm, AddUserForm, EditUserForm
 from datetime import datetime
 import logging
+import os
+from sqlalchemy import func
 
 app = Blueprint('main', __name__)
 
@@ -36,43 +38,104 @@ def login():
             print("Username entered:", username)
             print("Password entered")
         password = form.password.data
-        
+
         try:
             user = User.query.filter_by(Username=username).first()
             print("User found:", user)
 
             if user and check_password_hash(user.Password, password):
-                login_user(user)
-                if Config.DEBUG_MODE:
-                    print("User logged in as:", user)
-                
-                if not user.Security_Questions_Set:
-                    print("Security questions not set. Redirecting to set_security_questions.")
-                    return redirect(url_for('main.set_security_questions'))
-                elif user.Role in ['Administrator', 'Manager', 'Responder']:
-                    print("User is an admin, manager or responder. Redirecting to MFA verification.")
-                    if not user.MFA_Setup_Completed:
-                        print("MFA setup not completed. Redirecting to setup_MFA.")
-                        return redirect(url_for('main.setup_MFA'))
-                    elif user.MFA_Secret:
-                        print("MFA Secret found. Redirecting to MFA verification.")
-                        session['MFA_Required'] = True
-                        return redirect(url_for('main.MFA'))
+                if not user.First_Login_Completed:
+                    login_user(user)
+                    flash("You must change your password upon first login!")
+                    return redirect(url_for('main.change_password'))
+                else:
+                    login_user(user)
+                    if not user.Security_Questions_Set:
+                        print("Security questions not set. Redirecting to set_security_questions.")
+                        return redirect(url_for('main.set_security_questions'))
+                    if user.Role in ['Administrator', 'Manager', 'Responder']:
+                        print("User is an admin, manager or responder. Redirecting to MFA verification.")
+                        if not user.MFA_Setup_Completed:
+                            print("MFA setup not completed. Redirecting to setup_MFA.")
+                            return redirect(url_for('main.setup_MFA'))
+                        elif user.MFA_Secret:
+                            if not user.Is_Test_User:
+                                print("MFA Secret found. Redirecting to MFA verification.")
+                                session['MFA_Required'] = True
+                                return redirect(url_for('main.MFA'))
+                            else:
+                                return redirect(url_for('main.user_dashboard'))
+                                flash('Login successful!', 'success')
+                    else:
+                        return redirect(url_for('main.user_dashboard'))
+                        flash('Login successful!', 'success')
+                        print("Login successful. Redirecting to user_dashboard.")
+                    if Config.DEBUG_MODE:
+                        print("User logged in as:", user)
 
-                flash('Login successful!', 'success')
-                print("Loging successful. Redirecting to user_dashboard.")
-                return redirect(url_for('main.user_dashboard'))
             else:
                 flash('Invalid username or password.', 'danger')
                 if Config.DEBUG_MODE:
                     print("Invalid username or password.")
-                
+
         except Exception as e:
             flash('Login failed. Please try again.', 'danger')
             print("Login failed. Error:")
             print(e)
 
     return render_template('login.html', form=form)
+
+@app.route('/change_password', methods=['GET', 'POST'])
+@login_required
+def change_password():
+    form = ChangePasswordForm()
+    if form.validate_on_submit():
+        current_password = form.current_password.data
+        new_password = form.new_password.data
+        confirm_password = form.confirm_password.data
+
+        user = current_user
+
+        if not check_password_hash(user.Password, current_password):
+            flash("Current password is incorrect.", "danger")
+            return redirect(url_for('main.change_password'))
+
+        if new_password != confirm_password:
+            flash("New password and confirm password do not match.", "danger")
+            return redirect(url_for('main.change_password'))
+
+        user.Password = generate_password_hash(new_password)
+        user.First_Login_Completed = True
+
+        try:
+            db.session.commit()
+            flash("Password updated successfully!", "success")
+            if not user.Security_Questions_Set:
+                    print("Security questions not set. Redirecting to set_security_questions.")
+                    return redirect(url_for('main.set_security_questions'))
+
+                # Redirect based on user's role and MFA setup
+            if user.Role in ['Administrator', 'Manager', 'Responder']:
+                    print("User is an admin, manager or responder. Redirecting to MFA verification.")
+                    if not user.MFA_Setup_Completed:
+                        print("MFA setup not completed. Redirecting to setup_MFA.")
+                        return redirect(url_for('main.setup_MFA'))
+                    elif user.MFA_Secret:
+                        if not user.Is_Test_User:
+                            print("MFA Secret found. Redirecting to MFA verification.")
+                            session['MFA_Required'] = True
+                            return redirect(url_for('main.MFA'))
+                        else:
+                            return redirect(url_for('main.user_dashboard'))
+            else:
+                return redirect(url_for('main.user_dashboard'))
+        except Exception as e:
+            db.session.rollback()
+            flash("An error occurred while changing the password. Please try again.", "danger")
+            print(f"Error while changing password: {e}")
+
+    return render_template('change_password.html', form=form)
+
 
 
 #*MFA*
@@ -89,7 +152,7 @@ def setup_MFA():
         if request.method == 'POST':
             if 'complete_setup' in request.form:
                 otp = request.form.get('otp')
-                
+
                 if user.MFA_Secret:
                     if pyotp.TOTP(user.MFA_Secret).verify(otp):
                         try:
@@ -107,13 +170,13 @@ def setup_MFA():
 
         if user.MFA_Secret:
             otp_auth_url = create_otp_auth_url(user.MFA_Secret)
-            return render_template('setup_MFA.html', MFA_Setup_Completed=False, otp_auth_url=otp_auth_url)
+            return render_template('setup_mfa.html', MFA_Setup_Completed=False, otp_auth_url=otp_auth_url)
 
     flash('MFA secret not found. Please contact support.', 'danger')
-    return render_template('setup_MFA.html', MFA_Setup_Completed=False)
+    return render_template('setup_mfa.html', MFA_Setup_Completed=False)
 
 
-    
+
 def create_otp_auth_url(MFA_Secret):
     base_url = "otpauth://totp/"
     label = "SireApp"
@@ -121,7 +184,7 @@ def create_otp_auth_url(MFA_Secret):
     if Config.DEBUG_MODE:
         print("OTP Auth URL:", uri)
     return uri
-    
+
 @app.route('/MFA_verification', methods=['POST'])
 def MFA_verification():
     try:
@@ -143,7 +206,7 @@ def MFA_verification():
                 return redirect(url_for('main.user_dashboard'))
             else:
                 flash('Invalid OTP. Please try again.', 'danger')
-                return render_template('MFA_failed.html')
+                return render_template('mfa_failed.html')
         else:
             flash('MFA setup not completed. Please complete setup before logging in.', 'danger')
             return redirect(url_for('main.setup_MFA'))
@@ -167,20 +230,20 @@ def MFA():
                 return redirect(url_for('main.user_dashboard'))
             else:
                 flash('Invalid OTP. Please try again.', 'danger')
-                return render_template('MFA_failed.html')
+                return render_template('mfa_failed.html')
         else:
             flash('MFA setup not completed. Please complete setup before logging in.', 'danger')
             return redirect(url_for('main.setup_MFA'))
 
-    return render_template('MFA.html')
+    return render_template('mfa.html')
 
 @app.route('/setup_MFA_help')
 def setup_MFA_help():
-    return render_template('setup_MFA_help.html')
+    return render_template('setup_mfa_help.html')
 
 @app.route('/MFA_failed')
 def MFA_failed():
-    return render_template('MFA_failed.html')
+    return render_template('mfa_failed.html')
 
 #*Get_User*
 def get_user_by_session():
@@ -193,8 +256,8 @@ def get_user_by_session():
         if Config.DEBUG_MODE:
             print("Reset email found in session:", session['reset_email'])
         return User.query.filter_by(Email=session['reset_email']).first()
-    
-    
+
+
     if Config.DEBUG_MODE:
         print("No user found in session.")
 
@@ -207,14 +270,14 @@ def request_reset():
         email = request.form.get('email')
         if Config.DEBUG_MODE:
             print("Email entered:", email)
-        
+
         user = User.query.filter_by(Email=email).first()
         if Config.DEBUG_MODE:
             print("User found:", user)
 
         if user:
             password_reset_via_email(email)
-            
+
             flash('A password reset link has been sent to your email.', 'success')
             return redirect(url_for('main.login'))
         else:
@@ -238,7 +301,7 @@ def reset_password(token):
     if user is None:
         flash('User not found. Please try again.', 'danger')
         return redirect(url_for('main.login'))
-    
+
     security_questions_set = user.Security_Questions_Set
     first_login = not user.First_Login_Completed
     if Config.DEBUG_MODE:
@@ -263,7 +326,7 @@ def reset_password(token):
             return render_template('reset_password.html', email=email, verified=verified)
 
         hashed_password = generate_password_hash(new_password)
-        if Config.DEBUG_MODE: 
+        if Config.DEBUG_MODE:
             print("Hashed password generated")
 
         try:
@@ -280,7 +343,7 @@ def reset_password(token):
                 return redirect(url_for('main.login'))
             else:
                 flash('Invalid user role. Please try again.', 'danger')
-                
+
         except Exception as e:
             db.session.rollback()
             flash('Failed to reset password. Please try again.', 'danger')
@@ -303,7 +366,7 @@ def password_reset_MFA():
         user = User.query.filter_by(Email=email).first()
         if Config.DEBUG_MODE:
             print("User found:", user)
-        
+
         if not user:
             if Config.DEBUG_MODE:
                 print("User not found.")
@@ -325,7 +388,7 @@ def password_reset_MFA():
         flash('Invalid OTP. Please try again.', 'danger')
         if Config.DEBUG_MODE:
             print("Invalid OTP from user.")
-        return render_template('MFA_failed.html')
+        return render_template('mfa_failed.html')
 
     except Exception as e:
         flash('An error occurred during MFA verification. Please try again.', 'danger')
@@ -353,7 +416,7 @@ def reset_password_after_security_verification():
             print("User not found.")
         flash('User not found. Please try again.', 'danger')
         return redirect(url_for('main.request_reset'))
-    
+
     if user.Role in ['Administrator', 'Manager', 'Responder']:
         if Config.DEBUG_MODE:
             print("User is an admin, manager or responder. Redirecting to MFA verification.")
@@ -366,13 +429,13 @@ def reset_password_after_security_verification():
         if Config.DEBUG_MODE:
             print("Invalid user role.")
         flash('Invalid user role. Please try again.', 'danger')
-        
+
 
     if request.method == 'POST':
         new_password = request.form.get('new_password')
         if Config.DEBUG_MODE:
             print("New password entered")
-        
+
         if new_password:
             try:
                 user.Password = generate_password_hash(new_password)
@@ -394,14 +457,14 @@ def reset_password_after_security_verification():
             if Config.DEBUG_MODE:
                 print("No new password provided.")
 
-    
+
     return render_template('reset_password.html', email=email, verified=verified)
 
-    
+
 @app.route('/reset_password_after_MFA', methods=['GET', 'POST'])
-@login_required  
+@login_required
 def reset_password_after_MFA():
-    
+
     user = current_user
     if Config.DEBUG_MODE:
         print("User found:", user)
@@ -492,7 +555,7 @@ def set_security_questions():
     user = current_user
     if Config.DEBUG_MODE:
         print("Current user:", user)
-    
+
     if not user.is_authenticated:
         if Config.DEBUG_MODE:
             print("User not found.")
@@ -506,8 +569,8 @@ def set_security_questions():
             if Config.DEBUG_MODE:
                 print(f"Question {i}: {question_text}")
                 print(f"Answer {i}: {answer_text}")
-            
-            
+
+
             if question_text and answer_text:
                 security_question = SecurityQuestion.query.filter_by(Question_Text=question_text).first()
                 if Config.DEBUG_MODE:
@@ -522,21 +585,21 @@ def set_security_questions():
                     db.session.commit()
                     if Config.DEBUG_MODE:
                         print("DB Commit successful!")
-                
-                
+
+
                 user_answer = SecurityAnswer(User_ID=user.ID, Question_ID=security_question.ID, Answer_Text=answer_text)
                 db.session.add(user_answer)
                 if Config.DEBUG_MODE:
                     print("New security answer added to database:", user_answer)
 
-        user.Security_Questions_Set = True 
+        user.Security_Questions_Set = True
         if Config.DEBUG_MODE:
             print("Security_Questions_Set attribute updated for user:", user)
-        
+
         db.session.commit()
         if Config.DEBUG_MODE:
             print("DB Commit successful!")
-        
+
         flash('Security questions set up successfully!', 'success')
         if Config.DEBUG_MODE:
             print("Security questions set up successfully for user:", user)
@@ -567,83 +630,94 @@ def logout():
     return redirect(url_for('main.login'))
 
 #*Analytics*
-@app.route('/analytics')
+@app.route('/analytics', methods=['GET'])
 @login_required
 def analytics():
-    if current_user.Role not in ["Administrator", "Manager"]:
-        if Config.DEBUG_MODE:
-            print("User not authorized to view analytics. User role:", current_user.Role)
-        flash("You are not authorized to view this page.", "danger")
-        return redirect(url_for('main.user_dashboard'))
+    logout_form = LogoutForm()
 
-    try:
-        incident_count = Incident.query.count()
-        open_incident_count = Incident.query.filter_by(Status='Open').count()
-        resolved_incident_count = Incident.query.filter_by(Status='Resolved').count()
-        if Config.DEBUG_MODE:
-            print("Incident count:", incident_count)
-            print("Open incident count:", open_incident_count)
-            print("Resolved incident count:", resolved_incident_count)
+    user_filter = request.args.get('user', '').strip()
+    manager_filter = request.args.get('manager', '').strip()
+    category_filter = request.args.get('category', '').strip()
+    start_date = request.args.get('start_date', '').strip()
+    end_date = request.args.get('end_date', '').strip()
 
-        severity_data = (db.session.query(Incident.Severity, db.func.count(Incident.ID))
-                         .group_by(Incident.Severity).all())
-        if Config.DEBUG_MODE:
-            print("Severity data calculated")
-        severity_pie_chart = {
-            "data": [{
-                "values": [row[1] for row in severity_data],
-                "labels": [row[0] for row in severity_data],
-                "type": "pie"
-            }],
-            "layout": {"title": "Severity Distribution"}
-        }
-        if Config.DEBUG_MODE:
-            print("Severity pie chart generated")
+    users = User.query.all()
+    managers = User.query.filter_by(Is_Manager=True).all()
+    categories = [row[0] for row in db.session.query(Incident.Category).distinct()]
 
-        trend_data = (db.session.query(Incident.Created_At, db.func.count(Incident.ID))
-                      .group_by(Incident.Created_At).all())
-        if Config.DEBUG_MODE:
-            print("Trend data calculated")
-        incident_trend_chart = {
-            "data": [{
-                "x": [row[0] for row in trend_data],
-                "y": [row[1] for row in trend_data],
-                "type": "scatter",
-                "mode": "lines+markers"
-            }],
-            "layout": {"title": "Incident Trends Over Time", "xaxis": {"title": "Date"}, "yaxis": {"title": "Incidents"}}
-        }
-        if Config.DEBUG_MODE:
-            print("Incident trend chart generated")
+    query = db.session.query(Incident)
 
-        category_data = (db.session.query(Incident.Category, db.func.count(Incident.ID))
-                         .group_by(Incident.Category).all())
-        if Config.DEBUG_MODE:
-            print("Category data calculated")
-        category_bar_chart = {
-            "data": [{
-                "x": [row[0] for row in category_data],
-                "y": [row[1] for row in category_data],
-                "type": "bar"
-            }],
-            "layout": {"title": "Incident Categories", "xaxis": {"title": "Category"}, "yaxis": {"title": "Incidents"}}
-        }
-        if Config.DEBUG_MODE:
-            print("Category bar chart generated")
+    if user_filter:
+        query = query.filter(Incident.assigned_to.has(User.ID == user_filter))
 
-        return render_template(
-            'analytics.html',
-            incident_count=incident_count,
-            open_incident_count=open_incident_count,
-            resolved_incident_count=resolved_incident_count,
-            severity_pie_chart=severity_pie_chart,
-            incident_trend_chart=incident_trend_chart,
-            category_bar_chart=category_bar_chart
-        )
-    except Exception as e:
-        flash('Failed to retrieve analytics data.', 'danger')
-        print(f"Error: {e}")
-        return redirect(url_for('main.user_dashboard'))
+    if manager_filter:
+        query = query.filter(Incident.assigned_to.has(User.ID == manager_filter, User.Is_Manager == True))
+
+    if category_filter:
+        query = query.filter(Incident.Category.ilike(category_filter))  # Case-insensitive match
+
+    if start_date:
+        query = query.filter(Incident.Created_At >= start_date)
+
+    if end_date:
+        query = query.filter(Incident.Created_At <= end_date)
+
+    if Config.DEBUG_MODE:
+        print(f"Final filtered query: {query}")
+
+    incidents = query.all()
+
+    filters = []
+    if user_filter:
+        filters.append(Incident.assigned_to.has(User.ID == user_filter))
+
+    if manager_filter:
+        filters.append(Incident.assigned_to.has(User.ID == manager_filter, User.Is_Manager == True))
+
+    if category_filter:
+        filters.append(Incident.Category.ilike(category_filter))
+
+    if start_date:
+        filters.append(Incident.Created_At >= start_date)
+
+    if end_date:
+        filters.append(Incident.Created_At <= end_date)
+
+    category_data = db.session.query(
+        Incident.Category, func.count(Incident.ID)
+    ).filter(*filters).group_by(Incident.Category).all()
+
+    category_labels = [row[0] for row in category_data]
+    category_counts = [row[1] for row in category_data]
+
+    severity_data = db.session.query(
+        Incident.Severity, func.count(Incident.ID)
+    ).filter(*filters).group_by(Incident.Severity).all()
+
+    severity_labels = [row[0] for row in severity_data]
+    severity_counts = [row[1] for row in severity_data]
+
+    if Config.DEBUG_MODE:
+        print(f"Category Data: {category_data}")
+        print(f"Severity Data: {severity_data}")
+
+    return render_template(
+        'analytics.html',
+        form=logout_form,
+        user_filter=user_filter,
+        manager_filter=manager_filter,
+        category_filter=category_filter,
+        users=users,
+        managers=managers,
+        categories=categories,
+        category_labels=category_labels,
+        category_counts=category_counts,
+        severity_labels=severity_labels,
+        severity_counts=severity_counts,
+    )
+
+
+
 
 
 #*Report_Incident*
@@ -656,9 +730,9 @@ def report_incident():
         category = form.category.data
         severity = form.severity.data
         status = "New"
-       
+
         reporter = current_user.Username if current_user.is_authenticated else "Anonymous"
-        
+
         is_urgent = severity in ["High", "Critical"]
 
         if Config.DEBUG_MODE:
@@ -700,7 +774,7 @@ def generate_incident_id():
         last_incident = db.session.query(Incident.ID).order_by(Incident.ID.desc()).first()
         if Config.DEBUG_MODE:
             print("Last incident found:", last_incident)
-        
+
         last_id_number = last_incident.ID if last_incident else 999
         if Config.DEBUG_MODE:
             print("Last ID number:", last_id_number)
@@ -713,7 +787,7 @@ def generate_incident_id():
         return new_id_number
     except Exception as e:
         print(e)
-        return 100
+        return 1000
 
 
 #*Incident_Reported*
@@ -722,27 +796,29 @@ def incident_reported(incident_id):
     return render_template('successful_report.html', incident_id=incident_id)
 
 #*View_Incidents*
-@app.route('/view_incidents')
+@app.route('/view_incidents', methods=['GET', 'POST'])
 def view_incidents():
+    delete_inc_form = AdminIncidentDeleteForm()
     user = current_user
     if Config.DEBUG_MODE:
         print("Current user:", user)
     if user.is_authenticated:
         form = IncidentForm()
-    
+
         incidents = Incident.query.all()
         if Config.DEBUG_MODE:
             print("Incidents fetched successfully.")
 
-        return render_template('incidents.html', incidents=incidents, form=form)
+        return render_template('incidents.html', incidents=incidents, form=form, delete_inc_form=delete_inc_form)
     else:
         return redirect(url_for('main.user_dashboard'))
 
-#*View_Specific_Incident*    
+#*View_Specific_Incident*
 @app.route('/incident/<int:incident_id>', methods=['GET', 'POST'])
 def view_incident(incident_id):
     incident = Incident.query.get(incident_id)
     is_urgent = incident.Is_Urgent
+    print(incident.assigned_to)
     if Config.DEBUG_MODE:
         print("Incident found:", incident)
         print("Is urgent:", is_urgent)
@@ -757,18 +833,22 @@ def view_incident(incident_id):
         if Config.DEBUG_MODE:
             print("Note content found")
         if note_content:
-            new_work_note = WorkNote(Incident_ID=incident.ID, Note=note_content, Author=f"{session['first_name']} {session['last_name']}")
-            db.session.add(new_work_note)
-            if Config.DEBUG_MODE:
-                print("New work note added to database:")
-            incident.Updated_At = db.func.current_timestamp()
-            if Config.DEBUG_MODE:
-                print("Incident timestamp updated.")
-            db.session.commit()
-            if Config.DEBUG_MODE:
-                print("DB Commit successful!")
-            flash('Work note added successfully!', 'success')
-            return redirect(url_for('main.view_incident', incident_id=incident.ID))
+            if incident.Status != 'Resolved':
+                author_name = current_user.First_Name + ' ' + current_user.Last_Name
+                new_work_note = WorkNote(Incident_ID=incident.ID, Note=note_content, Author=f"{author_name}")
+                db.session.add(new_work_note)
+                if Config.DEBUG_MODE:
+                    print("New work note added to database:")
+                incident.Updated_At = db.func.current_timestamp()
+                if Config.DEBUG_MODE:
+                    print("Incident timestamp updated.")
+                db.session.commit()
+                if Config.DEBUG_MODE:
+                    print("DB Commit successful!")
+                flash('Work note added successfully!', 'success')
+                return redirect(url_for('main.view_incident', incident_id=incident.ID))
+            else:
+                flash("Incident is already resolved. No new work notes can be added!", 'danger')
         else:
             if Config.DEBUG_MODE:
                 print("No note content found.")
@@ -776,17 +856,33 @@ def view_incident(incident_id):
 
     return render_template('view_incident.html', incident=incident)
 
+@app.route('/main/resolve_incident/<int:incident_id>', methods=['POST'])
+def resolve_incident(incident_id):
+    incident = Incident.query.get_or_404(incident_id)
+    note = request.form.get('note')
+    if note:
+        new_note = WorkNote(Note=note, Author=current_user.Username, Created_At=db.func.current_timestamp(), Incident_ID=incident_id)
+        db.session.add(new_note)
+        db.session.commit()
+        incident.Status = 'Resolved'
+        incident.Updated_At = db.func.current_timestamp()
+        db.session.commit()
+        flash('Incident has been resolved.', 'success')
+    else:
+        flash('A work note is required to resolve the incident.', 'danger')
+    return redirect(url_for('main.view_incident', incident_id=incident_id))
+
 #*Assign_To_Me*
 @app.route('/assign_to_me/<int:incident_id>', methods=['POST'])
 @login_required
 def assign_to_me(incident_id):
 
-    user = current_user
-    if Config.DEBUG_MODE:
-        print("Current user:", user)
-
+    user = User.query.filter_by(Username=current_user.Username).first()
+    email = current_user.Email
+    first_name = current_user.First_Name
     incident = Incident.query.get(incident_id)
     if Config.DEBUG_MODE:
+        print("Current user:", user)
         print("Incident found:", incident)
 
     if incident is None:
@@ -810,16 +906,20 @@ def assign_to_me(incident_id):
         flash(f'You are already assigned to incident {incident_id}.', 'info')
     else:
         incident.assigned_to.append(user)
-        if Config.DEBUG_MODE:
-            print(f"User added to assigned_to list for incident {incident_id}.")
+        incident.Status = "In Progress"
+        incident.Updated_At = db.func.current_timestamp()
         try:
             db.session.commit()
             if Config.DEBUG_MODE:
                 print("DB Commit successful!")
+                print(f"Incident {incident} Status has been changed to 'In Progress'.")
+                print(f"User added to assigned_to list for incident {incident_id}.")
             flash(f'You have been assigned to incident {incident_id}.', 'success')
+            notify_assign_via_email(email, first_name, incident)
         except Exception as e:
             db.session.rollback()
             flash('Failed to assign to incident. Please try again.', 'danger')
+            flash(f"Error: {e}")
             print(f"Error: {e}")
 
     return redirect(url_for('main.view_incidents'))
@@ -847,22 +947,42 @@ def unassign_user(incident_id):
         flash("You do not have permission to unassign users from incidents.", "danger")
         return redirect(url_for('main.view_incidents'))
 
+    if request.method == 'POST':
+        username_to_remove = request.form.get('username')
+        if Config.DEBUG_MODE:
+            print("Username to unassign:", username_to_remove)
 
-#*Admin_Incidents*
-@app.route('/admin_incidents')
-@role_required('Administrator')
-def admin_incidents():
-    try:
-        incidents = Incident.query.all()
-        if Config.DEBUG_MODE:
-            print("Incidents fetched successfully.")
-        return render_template('admin_incidents.html', incidents=incidents)
-    except Exception as e:
-        if Config.DEBUG_MODE:
-            print("Error retrieving incidents.")
-        flash('Failed to retrieve incidents.', 'danger')
-        print(f"Error: {e}")
-        return redirect(url_for('main.home'))
+        if not username_to_remove:
+            flash("No user selected to unassign.", "danger")
+            return redirect(url_for('main.view_incidents'))
+
+
+        user_to_remove = User.query.filter_by(Username=username_to_remove).first()
+        if user_to_remove is None:
+            flash(f"User '{username_to_remove}' not found.", "danger")
+            return redirect(url_for('main.view_incidents'))
+
+        if user_to_remove in incident.assigned_to:
+            try:
+                incident.assigned_to.remove(user_to_remove)
+                incident.Updated_At = db.func.current_timestamp()
+                db.session.commit()
+                if Config.DEBUG_MODE:
+                    print(f"User '{username_to_remove}' unassigned successfully.")
+                flash(f"User '{username_to_remove}' has been unassigned from the incident.", "success")
+            except Exception as e:
+                db.session.rollback()
+                if Config.DEBUG_MODE:
+                    print("Error while unassigning user:", str(e))
+                flash("An error occurred while unassigning the user.", "danger")
+        else:
+            if Config.DEBUG_MODE:
+                print(f"User '{username_to_remove}' is not assigned to this incident.")
+            flash(f"User '{username_to_remove}' is not assigned to this incident.", "warning")
+
+        return redirect(url_for('main.view_incidents'))
+
+    return render_template('unassign_user.html', incident=incident)
 
 #*Admin_Dashboard*
 @app.route('/admin_dashboard')
@@ -891,6 +1011,7 @@ def admin_dashboard():
 @login_required
 def manager_dashboard():
 
+    user = current_user
     first_name = current_user.First_Name
     role = current_user.Role
     if Config.DEBUG_MODE:
@@ -904,12 +1025,20 @@ def manager_dashboard():
             print("User not authorized to view this page.")
         flash("You are not authorized to view this page.")
         return redirect(url_for('main.login'))
-    
+
+    team_incidents = Incident.query.join(User, Incident.assigned_to).filter(
+        User.Manager == user.Username
+    ).all()
+
     queue_incidents = Incident.query.filter(
         Incident.assigned_to == None
     ).all()
 
-    return render_template('manager_dashboard.html', first_name=first_name, form=logout_form)
+    urgent_incidents = Incident.query.filter(
+        (Incident.Is_Urgent == True) | (Incident.Severity.in_(['High', 'Critical']))
+    ).all()
+
+    return render_template('manager_dashboard.html', first_name=first_name, form=logout_form, team_incidents=team_incidents, queue_incidents=queue_incidents, urgent_incidents=urgent_incidents)
 
 
 #*Responder_Dashboard*
@@ -930,7 +1059,7 @@ def responder_dashboard():
             print("User not authorized to view this page.")
         flash("You are not authorized to view this page.")
         return redirect(url_for('main.login'))
-    
+
     assigned_incidents = Incident.query.filter(
         Incident.assigned_to.any(User.Username == user.Username)
     ).all()
@@ -948,7 +1077,7 @@ def responder_dashboard():
 
 #*User_Dashboard*
 @app.route('/user_dashboard')
-@login_required 
+@login_required
 def user_dashboard():
 
     first_name = current_user.First_Name
@@ -962,11 +1091,11 @@ def user_dashboard():
         print("Is manager:", is_manager)
         print("Is responder:", is_responder)
 
-    return render_template('user_dashboard.html', 
-                           first_name=first_name, 
-                           is_admin=is_admin, 
-                           is_manager=is_manager, 
-                           is_responder=is_responder, 
+    return render_template('user_dashboard.html',
+                           first_name=first_name,
+                           is_admin=is_admin,
+                           is_manager=is_manager,
+                           is_responder=is_responder,
                            form=logout_form)
 
 #*Admin_Users*
@@ -1007,7 +1136,7 @@ def admin_users_add():
         flash("You are not authorized to view this page.")
         return redirect(url_for('main.user_dashboard'))
     form = AddUserForm()
-    
+
     if form.validate_on_submit():
         first_name = form.first_name.data
         last_name = form.last_name.data
@@ -1080,7 +1209,7 @@ def admin_users_edit(user_id):
             print("User is not an admin and is unauthorized to view this page.")
         flash("You are not authorized to view this page.")
         return redirect(url_for('main.user_dashboard'))
-    
+
     user_to_edit = User.query.get_or_404(user_id)
     if Config.DEBUG_MODE:
         print("User to edit:", user_to_edit)
@@ -1092,7 +1221,7 @@ def admin_users_edit(user_id):
             print("EditUserForm errors:", form.errors)
         elif reset_form.errors != {}:
             print("ResetPasswordForm errors:", reset_form.errors)
-    
+
     if form.validate_on_submit():
         user_to_edit.First_Name = form.First_Name.data
         if Config.DEBUG_MODE:
@@ -1165,16 +1294,16 @@ def admin_users_edit(user_id):
 def admin_password_reset(user_id):
     user = current_user
     user_to_reset = User.query.get_or_404(user_id)
-    
+
     if Config.DEBUG_MODE:
         print("Current user:", user)
-    
+
     if not user.Is_Admin:
         if Config.DEBUG_MODE:
             print("User is not an admin and is unauthorized to view this page.")
         flash("You are not authorized to reset this password.")
         return redirect(url_for('main.user_dashboard'))
-    
+
     if user_to_reset.Security_Questions_Set == 0:
         flash("Security questions have not been set for this user. A temporary password will be sent to their email.", 'danger')
         temporary_password = secrets.token_urlsafe(16)
@@ -1192,26 +1321,26 @@ def admin_password_reset(user_id):
             flash('Failed to reset password. Please try again.', 'danger')
             print(f"Error: {e}")
         return redirect(url_for('main.admin_users'))
-    
+
     reset_form = AdminResetPasswordForm()
     if reset_form.validate_on_submit():
         if Config.DEBUG_MODE:
             print("User to reset:", user_to_reset)
         MFA_Secret = user.MFA_Secret
-        
+
         if not MFA_Secret:
             if Config.DEBUG_MODE:
                 print("Something has gone seriously wrong. MFA is not set up for this user, and this should not be possible.")
             flash("MFA is not set up for this user.", 'danger')
             return redirect(url_for('main.admin_users_edit', user_id=user_id))
-        
+
         totp = pyotp.TOTP(MFA_Secret)
-        if totp.verify(reset_form.MFA_otp.data):
+        if totp.verify(reset_form.mfa_otp.data):
             password_reset_via_email(user_to_reset.Email)
             session['admin_password_reset'] = True
             if Config.DEBUG_MODE:
                 print("Password reset link sent to user's email.")
-            
+
             flash(f'A password reset link has been sent to: {user_to_reset.Email}', 'success')
             return redirect(url_for('main.admin_users_edit', user_id=user_id))
         else:
@@ -1219,7 +1348,7 @@ def admin_password_reset(user_id):
                 print("Invalid MFA OTP entered.")
             flash('Invalid MFA OTP. Please try again.', 'danger')
             return redirect(url_for('main.admin_users_edit', user_id=user_id))
-        
+
     flash('Failed to validate MFA OTP. Please try again.', 'danger')
     if Config.DEBUG_MODE:
         print("Failed to validate MFA OTP.")
@@ -1232,20 +1361,33 @@ def admin_users_delete(user_id):
     user = current_user
     if Config.DEBUG_MODE:
         print("Current user:", user)
+
     if not user.Is_Admin:
         if Config.DEBUG_MODE:
             print("User is not an admin and is unauthorized to view this page.")
-        flash("You are not authorized to view this page.")
+        flash("You are not authorized to delete users.")
         return redirect(url_for('main.user_dashboard'))
+
     form = DeleteUserForm()
 
     if form.validate_on_submit():
+        MFA_Secret = user.MFA_Secret
+        if not MFA_Secret:
+            flash("MFA is not set up for this user, and this action should not be possible.", 'danger')
+            if Config.DEBUG_MODE:
+                print("MFA is not set up for the user.")
+            return redirect(url_for('main.admin_users_edit', user_id=user_id))
+
+        totp = pyotp.TOTP(MFA_Secret)
+        if not totp.verify(form.mfa_otp.data):
+            flash('Invalid MFA OTP. Please try again.', 'danger')
+            if Config.DEBUG_MODE:
+                print("Invalid MFA OTP entered.")
+            return redirect(url_for('main.admin_users_edit', user_id=user_id))
+
         user_to_delete = User.query.get(user_id)
-        if Config.DEBUG_MODE:
-            print(f"User to delete: {user_to_delete}")
         current_user_id = current_user.ID
-        if Config.DEBUG_MODE:
-            print(f"Current user ID: {current_user_id}")
+
         if user_to_delete:
             if user_to_delete.ID == current_user_id:
                 flash('You cannot delete your own account.', 'danger')
@@ -1254,23 +1396,22 @@ def admin_users_delete(user_id):
             else:
                 try:
                     db.session.delete(user_to_delete)
-                    if Config.DEBUG_MODE:
-                        print("User marked for deletion.")
                     db.session.commit()
-                    if Config.DEBUG_MODE:
-                        print("DB Commit successful!")
-                        print("User deleted successfully.")
                     flash('User deleted successfully!', 'success')
+                    if Config.DEBUG_MODE:
+                        print("User deleted successfully.")
                 except Exception as e:
                     db.session.rollback()
                     flash('Failed to delete user. Please try again.', 'danger')
                     print(f"Error: {e}")
         else:
             flash('User not found.', 'danger')
+
     else:
         flash('Invalid CSRF token or form submission.', 'danger')
 
-    return redirect(url_for('main.admin_users'))
+    return redirect(url_for('main.admin_users', user_id=user_id))
+
 
 #*Admin_Edit_Incident*
 @app.route('/admin_incidents_edit_<string:incident_id>', methods=['GET', 'POST'])
@@ -1278,43 +1419,74 @@ def admin_edit_incident(incident_id):
     user = current_user
     if Config.DEBUG_MODE:
         print("Current user:", user)
+
     if not user.Is_Admin:
         if Config.DEBUG_MODE:
             print("User is not an admin and is unauthorized to view this page.")
         flash("You are not authorized to view this page.")
         return redirect(url_for('main.user_dashboard'))
-    incident = Incident.query.filter_by(ID=incident_id).first()
-    if Config.DEBUG_MODE:
-        print("Incident to edit:", incident)
 
-    if not incident:
+    incident_to_edit = Incident.query.filter_by(ID=incident_id).first()
+    if Config.DEBUG_MODE:
+        print("Incident to edit:", incident_to_edit)
+
+    if not incident_to_edit:
         if Config.DEBUG_MODE:
             print("Incident not found.")
         flash('Incident not found.', 'danger')
         return redirect(url_for('main.view_incidents'))
 
-    form = IncidentForm()
+    form = IncidentForm(obj=incident_to_edit)
+    assign_form = AssignUserForm()
+
+    users = User.query.all()
+    assign_form.username.choices = [(user.Username, f"{user.First_Name} {user.Last_Name}") for user in users]
+
     if request.method == 'GET':
-        form.title.data = incident.Title
-        form.description.data = incident.Description
-        form.severity.data = incident.Severity
-        form.category.data = incident.Category
-    else:
-        form = IncidentForm(request.form)
-    if Config.DEBUG_MODE:
-        print("Form data:", form.data)
+        form.title.data = incident_to_edit.Title
+        form.description.data = incident_to_edit.Description
+        form.category.data = incident_to_edit.Category
+        form.severity.data = incident_to_edit.Severity
+        form.is_urgent.data = incident_to_edit.Is_Urgent
+        form.status.data = incident_to_edit.Status
+        if isinstance(incident_to_edit.assigned_to, (list, set)):
+            form.assigned_to.data = ', '.join([user.Username for user in incident_to_edit.assigned_to])
+        else:
+            form.assigned_to.data = incident_to_edit.assigned_to
+
 
     if form.validate_on_submit():
-        incident.Title = form.title.data
-        incident.Description = form.description.data
-        incident.Severity = form.severity.data
-        incident.Category = form.category.data
+        incident_to_edit.Title = form.title.data
+        incident_to_edit.Description = form.description.data
+        incident_to_edit.Category = form.category.data
+        incident_to_edit.Severity = form.severity.data
+        incident_to_edit.Status = form.status.data
+        is_urgent_value = form.is_urgent.data.lower() in ['true', '1', 'yes'] if isinstance(form.is_urgent.data, str) else bool(form.is_urgent.data)
+        incident_to_edit.Is_Urgent = is_urgent_value
+        incident_to_edit.Updated_At = db.func.current_timestamp()
+
+        assigned_to_data = form.assigned_to.data
+        assigned_to_list = [item.strip() for item in assigned_to_data.split(',') if item.strip()] if isinstance(assigned_to_data, str) else assigned_to_data
+        incident_to_edit.assigned_to = assigned_to_list
+
+        if Config.DEBUG_MODE:
+            print("Incident_to_edit.ID:", incident_to_edit.ID)
+            print("Incident_to_edit.Title:", incident_to_edit.Title)
+            print("Incident_to_edit.Description:", incident_to_edit.Description)
+            print("Incident_to_edit.Category:", incident_to_edit.Category)
+            print("Incident_to_edit.Severity:", incident_to_edit.Severity)
+            print("Incident_to_edit.Status:", incident_to_edit.Status)
+            print("Incident_to_edit.Reporter:", incident_to_edit.Reporter)
+            print("Incident_to_edit.Created_At:", incident_to_edit.Created_At)
+            print("Incident_to_edit.Updated_At:", incident_to_edit.Updated_At)
+            print("Incident_to_edit.Is_Urgent:", incident_to_edit.Is_Urgent)
+            print("Incident_to_edit.assigned_to:", incident_to_edit.assigned_to)
 
         try:
             db.session.commit()
             if Config.DEBUG_MODE:
                 print("DB Commit successful!")
-                print("Form data:", form.data)
+                print("Updated Incident:", incident_to_edit)
             flash('Incident updated successfully!', 'success')
             return redirect(url_for('main.view_incidents'))
         except Exception as e:
@@ -1322,19 +1494,48 @@ def admin_edit_incident(incident_id):
             flash('Failed to update incident. Please try again.', 'danger')
             logger.error(f"Error while updating incident: {e}")
 
-    if form.errors:
-        logger.error(f"Validation errors: {form.errors}")
-    else:
-        logger.warning("Form validation did not pass, but no specific errors were recorded.")
+    if assign_form.validate_on_submit():
+        username_to_assign = assign_form.username.data
+        if Config.DEBUG_MODE:
+            print("Username to assign:", username_to_assign)
 
-    return render_template('admin_incidents_edit.html', form=form, incident=incident)
+        if username_to_assign not in [user.Username for user in incident_to_edit.assigned_to]:
+            try:
+                user_to_assign = User.query.filter_by(Username=username_to_assign).first()
+
+                if user_to_assign:
+                    responder_name = user_to_assign.First_Name
+                    responder_email = user_to_assign.Email
+                    incident_to_edit.assigned_to.append(user_to_assign)
+                    incident_to_edit.Status = "In Progress"
+                    incident_to_edit.Updated_At = db.func.current_timestamp()
+                    if Config.DEBUG_MODE:
+                        print(f"Incident {incident_to_edit} Status has been changed to 'In Progress'.")
+                    db.session.commit()
+                    notify_assign_via_email(responder_email, responder_name, incident_to_edit)
+                    if Config.DEBUG_MODE:
+                        print(f"User '{username_to_assign}' assigned successfully.")
+                        flash(f"User '{username_to_assign}' has been assigned to the incident.", 'success')
+                    else:
+                        flash(f"User '{username_to_assign}' does not exist.", 'danger')
+            except Exception as e:
+                db.session.rollback()
+                flash('Failed to assign user. Please try again.', 'danger')
+                logger.error(f"Error while assigning user: {e}")
+        else:
+            flash(f"User '{username_to_assign}' is already assigned to this incident.", 'warning')
+
+    return render_template('admin_incidents_edit.html', form=form, assign_form=assign_form, incident_to_edit=incident_to_edit)
+
 
 
 #*Admin_Delete_Incident*
-@app.route('/admin_incidents_delete_<string:incident_id>', methods=['POST'])
+@app.route('/admin_delete_incident/<int:incident_id>', methods=['POST'])
 @login_required
 def admin_delete_incident(incident_id):
     user = current_user
+    MFA_Secret = user.MFA_Secret
+    form = AdminIncidentDeleteForm()
     if Config.DEBUG_MODE:
         print("Current user:", user)
     if not user.Is_Admin:
@@ -1346,21 +1547,30 @@ def admin_delete_incident(incident_id):
     if Config.DEBUG_MODE:
         print("Incident to delete:", incident)
 
-    if incident:
-        try:
-            db.session.delete(incident)
-            if Config.DEBUG_MODE:
-                print(f"Incident {incident_id} marked for deletion.")
-            db.session.commit()
-            if Config.DEBUG_MODE:
-                print("DB Commit successful!")
-            flash('Incident deleted successfully!', 'success')
-        except Exception as e:
-            db.session.rollback()
-            flash('Failed to delete incident. Please try again.', 'danger')
-            print(f"Error: {e}")
+    totp = pyotp.TOTP(MFA_Secret)
+    if totp.verify(form.mfa_otp.data):
+        if incident:
+            try:
+                db.session.delete(incident)
+                if Config.DEBUG_MODE:
+                    print(f"Incident {incident_id} marked for deletion.")
+                db.session.commit()
+                if Config.DEBUG_MODE:
+                    print("DB Commit successful!")
+                flash('Incident deleted successfully!', 'success')
+            except Exception as e:
+                db.session.rollback()
+                flash('Failed to delete incident. Please try again.', 'danger')
+                print(f"Error: {e}")
+        else:
+            flash('Incident not found.', 'danger')
+        return redirect(url_for('main.view_incidents'))
+
     else:
-        flash('Incident not found.', 'danger')
+        flash("MFA Code incorrect, please try again.", "danger")
+        if Config.DEBUG_MODE:
+            print("Invalid MFA code entered.")
+        return redirect(url_for('main.view_incidents'))
 
     return redirect(url_for('main.view_incidents'))
 

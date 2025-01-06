@@ -73,9 +73,9 @@
         <div class="message">
             Incident {{ incident_id }} has been reported successfully.
         </div>
-<a href="{{ url_for('main.user_dashboard') if 'user_id' in session else url_for('main.login') }}" class="btn">Home</a>
+<a href="{{ url_for('main.user_dashboard') if current_user.is_authenticated else url_for('main.login') }}" class="btn">Home</a>
 
-        
+
     </div>
 </body>
 </html>

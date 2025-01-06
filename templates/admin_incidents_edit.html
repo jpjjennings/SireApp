@@ -10,13 +10,13 @@
         .container {
             margin-top: 30px;
             max-width: 800px;
-            width: 90%; 
+            width: 90%;
         }
         .logo-container {
             margin-bottom: 20px;
         }
         .logo {
-            max-width: 200px; 
+            max-width: 200px;
             width: 100%;
             height: auto;
         }
@@ -25,7 +25,7 @@
 <body>
     <div class="container mt-4">
         <div class="logo-container">
-            <a href="{{ url_for('main.home') }}">
+            <a href="{{ url_for('main.view_incidents') }}">
                 <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo" class="logo">
             </a>
         </div>
@@ -33,37 +33,54 @@
             {% with messages = get_flashed_messages(with_categories=True) %}
                 {% if messages %}
                     <div class="messages">
-                        <ul>
                         {% for category, message in messages %}
-                            <li class="{{ category }}">{{ message }}</li>
+                            <div class="alert alert-{{ category }}" role="alert">
+                                {{ message }}
+                            </div>
                         {% endfor %}
-                        </ul>
                     </div>
-                {% endif %}
-                {% if form.errors %}
-                    <ul class="error-list">
-                    {% for field, errors in form.errors.items() %}
-                        <li>{{ field }}: {{ errors|join(', ') }}</li>
-                    {% endfor %}
-                    </ul>
                 {% endif %}
             {% endwith %}
         </div>
         <h2 class="text-center mb-4">Edit Incident</h2>
-        
-        <form action="{{ url_for('main.admin_edit_incident', incident_id=incident.ID) }}" method="POST">
+
+        <form method="POST" action="{{ url_for('main.admin_edit_incident', incident_id=incident_to_edit.ID) }}">
             {{ form.hidden_tag() }}
-            {% for field in ['title', 'description', 'category', 'severity'] %}
-                <div class="form-group">
-                    <label for="{{ field }}">{{ field.capitalize() }}</label>
-                    {{ form[field](class="form-control", required=True) }}
-                </div>
-            {% endfor %}
-            <div class="text-center">
-                <button type="submit" class="btn btn-primary">Update Incident</button>
-                <a href="{{ url_for('main.view_incidents') }}" class="btn btn-secondary">Cancel</a>
+            <div class="form-group">
+                {{ form.title.label }}
+                {{ form.title(class="form-control") }}
             </div>
+            <div class="form-group">
+                {{ form.description.label }}
+                {{ form.description(class="form-control") }}
+            </div>
+            <div class="form-group">
+                {{ form.category.label }}
+                {{ form.category(class="form-control") }}
+            </div>
+            <div class="form-group">
+                {{ form.severity.label }}
+                {{ form.severity(class="form-control") }}
+            </div>
+            <div class="form-group">
+                {{ form.status.label }}
+                {{ form.status(class="form-control") }}
+            </div>
+            <div class="form-check">
+                {{ form.is_urgent(class="form-check-input") }}
+                {{ form.is_urgent.label(class="form-check-label") }}
+            </div>
+            <button type="submit" class="btn btn-primary">Update Incident</button>
         </form>
+
+        <h2>Assign User to Incident</h2>
+        <form method="POST" action="{{ url_for('main.admin_edit_incident', incident_id=incident_to_edit.ID) }}">
+            {{ assign_form.hidden_tag() }}
+            <label for="username">Select a user to assign:</label>
+            {{ assign_form.username(class="form-control") }}
+            <button type="submit" class="btn btn-success">Assign User</button>
+        </form>
+        <a href="{{ url_for('main.view_incidents') }}" class="btn btn-secondary">Cancel</a>
     </div>
 </body>
 </html>

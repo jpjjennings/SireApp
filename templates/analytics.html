@@ -4,8 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Incident Analytics Dashboard</title>
+    <!-- External Libraries -->
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Custom Styles -->
     <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='styles.css') }}">
     <style>
         .container {
@@ -16,9 +21,6 @@
             box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
             width: 100%;
         }
-        .analytics-section {
-            margin-bottom: 30px;
-        }
         .chart-container {
             width: 100%;
             max-width: 700px;
@@ -27,82 +29,145 @@
         h1, h2 {
             text-align: center;
         }
-        .stat-card {
-            text-align: center;
-            padding: 20px;
-            margin: 15px 0;
-            border: 1px solid #ddd;
-            border-radius: 10px;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        .form-group label {
+            font-weight: bold;
         }
-        .stat-card h3 {
-            margin: 10px 0;
+        .btn-logout {
+            margin-left: 10px;
+        }
+        .messages {
+            margin: 15px 0;
+        }
+        .logo {
+            max-width: 120px;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="logo-container">
-            <a href="{{ url_for('main.home') }}">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <a href="{{ url_for('main.user_dashboard') }}">
                 <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo" class="logo">
             </a>
+            <div>
+                <a href="{{ url_for('main.user_dashboard') }}" class="btn btn-secondary">Dashboard</a>
+                <form method="POST" action="{{ url_for('main.logout') }}" style="display:inline;">
+                    {{ form.hidden_tag() }}
+                    <button type="submit" class="btn btn-danger btn-logout">Logout</button>
+                </form>
+            </div>
         </div>
-        
         <h1>Incident Analytics Dashboard</h1>
-        <div>
-            {% with messages = get_flashed_messages(with_categories=True) %}
-            {% if messages %}
-                <div class="messages">
-                    <ul>
+
+        {% with messages = get_flashed_messages(with_categories=True) %}
+        {% if messages %}
+            <div class="messages alert alert-info">
+                <ul>
                     {% for category, message in messages %}
                         <li class="{{ category }}">{{ message }}</li>
                     {% endfor %}
-                    </ul>
+                </ul>
+            </div>
+        {% endif %}
+        {% endwith %}
+
+        <form method="get" class="mb-4">
+            <div class="form-row">
+                <div class="form-group col-md-4">
+                    <label for="user">Filter by User:</label>
+                    <select id="user" name="user" class="form-control">
+                        <option value="">Select User</option>
+                        {% for user in users %}
+                            <option value="{{ user.ID }}" {% if user.ID == user_filter %}selected{% endif %}>{{ user.Username }}</option>
+                        {% endfor %}
+                    </select>
                 </div>
-            {% endif %}
-            {% endwith %}
-        </div>
-        <div class="row text-center">
-            <div class="col-md-4 stat-card">
-                <h3>Total Incidents</h3>
-                <p class="display-4">{{ incident_count }}</p>
+                <div class="form-group col-md-4">
+                    <label for="manager">Filter by Manager:</label>
+                    <select id="manager" name="manager" class="form-control">
+                        <option value="">Select Manager</option>
+                        {% for manager in managers %}
+                            <option value="{{ manager.ID }}" {% if manager.ID == manager_filter %}selected{% endif %}>{{ manager.Username }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group col-md-4">
+                    <label for="category">Filter by Category:</label>
+                    <select id="category" name="category" class="form-control">
+                        <option value="">Select Category</option>
+                        {% for category in categories %}
+                            <option value="{{ category }}" {% if category == category_filter %}selected{% endif %}>{{ category }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
             </div>
-            <div class="col-md-4 stat-card">
-                <h3>Open Incidents</h3>
-                <p class="display-4">{{ open_incident_count }}</p>
+            <div class="form-row">
+                <div class="form-group col-md-6">
+                    <label for="start_date">Start Date:</label>
+                    <input type="text" id="start_date" name="start_date" class="form-control datepicker" value="{{ request.args.get('start_date') }}">
+                </div>
+                <div class="form-group col-md-6">
+                    <label for="end_date">End Date:</label>
+                    <input type="text" id="end_date" name="end_date" class="form-control datepicker" value="{{ request.args.get('end_date') }}">
+                </div>
             </div>
-            <div class="col-md-4 stat-card">
-                <h3>Resolved Incidents</h3>
-                <p class="display-4">{{ resolved_incident_count }}</p>
+            <button type="submit" class="btn btn-primary">Apply Filters</button>
+        </form>
+
+        <div class="row mb-5">
+            <div class="col-md-6">
+                <div class="chart-container">
+                    <canvas id="categoryChart"></canvas>
+                </div>
             </div>
-        </div>
-
-        <div class="analytics-section">
-            <h2>Severity Distribution</h2>
-            <div class="chart-container" id="severity_pie_chart"></div>
-        </div>
-
-        <div class="analytics-section">
-            <h2>Incident Trends Over Time</h2>
-            <div class="chart-container" id="incident_trend_chart"></div>
-        </div>
-
-        <div class="analytics-section">
-            <h2>Incident Categories</h2>
-            <div class="chart-container" id="category_bar_chart"></div>
+            <div class="col-md-6">
+                <div class="chart-container">
+                    <canvas id="severityChart"></canvas>
+                </div>
+            </div>
         </div>
     </div>
 
-    <script type="text/javascript">
-        var severityPieChart = {{ severity_pie_chart | safe }};
-        Plotly.newPlot('severity_pie_chart', severityPieChart.data, severityPieChart.layout);
-    
-        var incidentTrendChart = {{ incident_trend_chart | safe }};
-        Plotly.newPlot('incident_trend_chart', incidentTrendChart.data, incidentTrendChart.layout);
-    
-        var categoryBarChart = {{ category_bar_chart | safe }};
-        Plotly.newPlot('category_bar_chart', categoryBarChart.data, categoryBarChart.layout);
+    <script>
+        flatpickr(".datepicker", {
+            dateFormat: "Y-m-d",
+            allowInput: true
+        });
     </script>
-    
+
+    <script>
+        const categoryCtx = document.getElementById('categoryChart').getContext('2d');
+        const categoryChart = new Chart(categoryCtx, {
+            type: 'pie',
+            data: {
+                labels: {{ category_labels|tojson }},
+                datasets: [{
+                    data: {{ category_counts|tojson }},
+                    backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF', '#FF9F40'],
+                }]
+            }
+        });
+
+
+        const severityCtx = document.getElementById('severityChart').getContext('2d');
+        const severityChart = new Chart(severityCtx, {
+            type: 'bar',
+            data: {
+                labels: {{ severity_labels|tojson }},
+                datasets: [{
+                    label: 'Incidents by Severity',
+                    data: {{ severity_counts|tojson }},
+                    backgroundColor: '#36A2EB',
+                }]
+            },
+            options: {
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+    </script>
 </body>
 </html>

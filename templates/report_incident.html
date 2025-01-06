@@ -80,6 +80,7 @@
     background-color: #333333;
 }
 
+/* Flex container */
 .button-container {
     display: flex;
     justify-content: space-between;
@@ -141,7 +142,7 @@
         <h1>Report Incident</h1>
         <form action="{{ url_for('main.report_incident') }}" method="POST">
             {{ form.hidden_tag() }}
-            
+
             <div class="form-group">
                 <label for="title">Title:</label>
                 {{ form.title(class="form-control") }}
@@ -149,7 +150,7 @@
                     <small class="text-danger">{{ form.title.errors[0] }}</small>
                 {% endif %}
             </div>
-    
+
             <div class="form-group">
                 <label for="description">Description:</label>
                 {{ form.description(class="form-control") }}
@@ -165,7 +166,7 @@
                     <small class="text-danger">{{ form.category.errors[0] }}</small>
                 {% endif %}
             </div>
-    
+
             <div class="form-group">
                 <label for="severity">Severity:</label>
                 {{ form.severity(class="form-control") }}
@@ -174,10 +175,18 @@
                 {% endif %}
             </div>
 
+            <div class="form-group">
+                <label for="status">Status:</label>
+                {{ form.status(class="form-control", readonly="readonly") }}
+                {% if form.status.errors %}
+                    <small class="text-danger">{{ form.description.errors[0] }}</small>
+                {% endif %}
+            </div>
+
             <button type="submit" class="btn btn-submit">Submit Report</button>
 
             <div class="button-container">
-    
+
             {% if current_user.is_authenticated %}
             <a href="{{ url_for('main.user_dashboard') }}" class="btn btn-dashboard">Dashboard</a>
             {% else %}
@@ -185,7 +194,7 @@
             {% endif %}
         </div>
         </form>
-        
+
     </div>
 </body>
 </html>

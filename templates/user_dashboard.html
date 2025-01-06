@@ -136,11 +136,11 @@
 <body>
     <div class="container">
         <div class="logo-container">
-            <a href="{{ url_for('main.home') }}">
+            <a href="{{ url_for('main.logout') }}">
                 <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo" class="logo">
             </a>
         </div>
-        
+
         <div>
             {% with messages = get_flashed_messages(with_categories=True) %}
             {% if messages %}
@@ -172,20 +172,18 @@
                 <a href="{{ url_for('main.admin_dashboard') }}" class="btn btn-admin">Admin Panel</a>
                 <a href="{{ url_for('main.manager_dashboard') }}" class="btn btn-manager">Manager Dashboard</a>
                 <a href="{{ url_for('main.responder_dashboard') }}" class="btn btn-responder">Responder Dashboard</a>
-            {% endif %}
-            {% if current_user.Is_Manager %}
+            {% elif current_user.Is_Manager %}
                 <a href="{{ url_for('main.manager_dashboard') }}" class="btn btn-manager">Manager Dashboard</a>
                 <a href="{{ url_for('main.responder_dashboard') }}" class="btn btn-responder">Responder Dashboard</a>
-            {% endif %}
-            {% if current_user.Is_Responder %}
+            {% elif current_user.Is_Responder %}
                 <a href="{{ url_for('main.responder_dashboard') }}" class="btn btn-responder">Responder Dashboard</a>
             {% endif %}
         </div>
-        
+
         <form method="POST" action="{{ url_for('main.logout') }}">
             {{ form.hidden_tag() }}
             <button type="submit" class="btn btn-logout">Logout</button>
-        </form>   
+        </form>
     </div>
 </body>
 </html>

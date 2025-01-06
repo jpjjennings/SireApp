@@ -8,108 +8,116 @@
     <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='styles.css') }}">
     <style>
         body {
-    font-family: 'Arial', sans-serif;
-    background-color: #f9f9f9;
-    margin: 0;
-    padding: 0;
-}
+            font-family: 'Arial', sans-serif;
+            background-color: #f9f9f9;
+            margin: 0;
+            padding: 0;
+        }
 
-.container {
-    max-width: 2000px;
-    max-height: 95vh;
-    overflow-y: auto;
-    width: 90%;
-    margin: 40px auto;
-    padding: 20px;
-    background-color: #ffffff;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-    border-radius: 10px;
-}
+        .container {
+            max-width: 2000px;
+            max-height: 95vh;
+            overflow-y: auto;
+            width: 90%;
+            margin: 40px auto;
+            padding: 20px;
+            background-color: #ffffff;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+        }
 
-.logo-container {
-    margin-bottom: 20px;
-}
+        .logo-container {
+            margin-bottom: 20px;
+        }
 
-.flash-messages {
-    color: #f00000;
-    font-size: 22px;
-    font-weight: bold;
-}
+        .flash-messages {
+            color: #f00000;
+            font-size: 22px;
+            font-weight: bold;
+        }
 
-li {
-    list-style-type: none;
-}
+        li {
+            list-style-type: none;
+        }
 
-.logo {
-    max-width: 200px;
-    width: 100%;
-    height: auto;
-}
+        .logo {
+            max-width: 200px;
+            width: 100%;
+            height: auto;
+        }
 
-.content {
-    display: flex;
-    justify-content: space-between;
-    margin-bottom: 20px;
-}
+        .content {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
 
-.details, .notes {
-    width: 48%;
-    border: 1px solid #ccc;
-    padding: 15px;
-    border-radius: 5px;
-    background: #f4f4f4;
-    text-align: left;
-    overflow-y: auto;
-}
+        .details, .notes {
+            width: 48%;
+            border: 1px solid #ccc;
+            padding: 15px;
+            border-radius: 5px;
+            background: #f4f4f4;
+            text-align: left;
+            overflow-y: auto;
+        }
 
-.add-note {
-    border-top: 1px solid #ccc;
-    border-bottom: 1px solid #ccc;
-    padding: 15px 0;
-    margin-bottom: 20px;
-    text-align: center;
-}
+        .add-note {
+            border-top: 1px solid #ccc;
+            border-bottom: 1px solid #ccc;
+            padding: 15px 0;
+            margin-bottom: 20px;
+            text-align: center;
+        }
 
-.input-note {
-    width: 70%;
-    padding: 10px;
-    border-radius: 5px;
-    border: 1px solid #ccc;
-    margin-right: 10px;
-}
+        .input-note {
+            width: 70%;
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+            margin-right: 10px;
+        }
 
-button {
-    background-color: #007bff;
-    color: #fff;
-    border: none;
-    border-radius: 5px;
-    padding: 10px 15px;
-    cursor: pointer;
-    transition: background-color 0.3s, transform 0.3s;
-    font-size: 16px;
-}
+        button {
+            background-color: #007bff;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            padding: 10px 15px;
+            cursor: pointer;
+            transition: background-color 0.3s, transform 0.3s;
+            font-size: 16px;
+        }
 
-button:hover {
-    background-color: #0056b3;
-    transform: scale(1.05);
-}
+        button:hover {
+            background-color: #0056b3;
+            transform: scale(1.05);
+        }
 
-.back-button {
-    text-align: center;
-    padding: 10px 0;
-    background-color: #f4f4f4;
-    border-radius: 5px;
-}
-.urgent-heading {
+        .back-button {
+            text-align: center;
+            padding: 10px 0;
+            background-color: #f4f4f4;
+            border-radius: 5px;
+        }
+
+        .urgent-heading {
             color: red;
             font-weight: bold;
+        }
+
+        .disabled-input {
+            background-color: #e9ecef;
+            border-color: #ced4da;
+            color: #495057;
+            cursor: not-allowed;
         }
     </style>
 </head>
 <body>
     <div class="container mt-4">
         <div class="logo-container">
-            <a href="{{ url_for('main.home') }}">
+            <a href="{{ url_for('main.view_incidents') }}">
                 <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo" class="logo">
             </a>
         </div>
@@ -161,16 +169,50 @@ button:hover {
                 </ul>
             </div>
         </div>
+
+        {% if incident.Status != 'Resolved' %}
+            <div class="resolve-button">
+                <button type="button" class="btn btn-success" data-toggle="modal" data-target="#resolveModal">Resolve Incident</button>
+            </div>
+        {% endif %}
+
         <div class="add-note">
             <h3>Add Work Note</h3>
             <form method="POST" action="{{ url_for('main.view_incident', incident_id=incident.ID) }}">
-                <input type="text" name="note" required placeholder="Enter your work note here...">
-                <button type="submit">Add Note</button>
-        </form>
-    </div>
-    <div class="back-button">
+                <input type="text" name="note" required placeholder="Enter your work note here..." class="{{ 'disabled-input' if incident.Status == 'Resolved' else '' }}">
+                <button type="submit" class="{{ 'disabled-input' if incident.Status == 'Resolved' else '' }}">Add Note</button>
+            </form>
+        </div>
+        <div class="back-button">
             <button type="button" onclick="location.href='{{ url_for('main.view_incidents') }}'">Back to Incidents</button>
         </div>
+
+        <!-- Resolve Modal -->
+        <div class="modal fade" id="resolveModal" tabindex="-1" role="dialog" aria-labelledby="resolveModalLabel" aria-hidden="true">
+            <div class="modal-dialog" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="resolveModalLabel">Resolve Incident</h5>
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="resolveForm" method="POST" action="{{ url_for('main.resolve_incident', incident_id=incident.ID) }}">
+                            <div class="form-group">
+                                <label for="resolveNote">Work Note</label>
+                                <input type="text" class="form-control" id="resolveNote" name="note" required placeholder="Enter your work note here...">
+                            </div>
+                            <button type="submit" class="btn btn-primary">Submit</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
+
+    <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js"></script>
 </body>
 </html>

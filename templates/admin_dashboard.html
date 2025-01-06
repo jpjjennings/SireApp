@@ -40,7 +40,7 @@
         .welcome-message h1 {
             font-size: 20px;
             margin-bottom: 20px;
-            color: #333; 
+            color: #333;
         }
 
         .profile-pic-container {
@@ -110,7 +110,7 @@
 <body>
     <div class="container">
         <div class="logo-container">
-            <a href="{{ url_for('main.home') }}">
+            <a href="{{ url_for('main.user_dashboard') }}">
                 <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo" class="logo">
             </a>
         </div>
@@ -153,7 +153,7 @@
             {{ form.hidden_tag() }}
             <button type="submit" class="btn btn-logout">Logout</button>
         </form>
-        
+
     </div>
 </body>
 </html>
