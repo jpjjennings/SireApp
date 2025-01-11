@@ -4,6 +4,8 @@
 
 An Incident Management focused web application written in Python-Flask as a final-year project of my BSc (Hons) Cybersecurity and Networking Infrastructure. I am enrolled at Belfast Metropolitan College and this BSc (Hons) degree is underwritten by the Open University.
 
+Find information regarding the testing environment [here](https://github.com/jpjjennings/SireApp/wiki#testing)
+
 MIT License
 
 
